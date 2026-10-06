@@ -198,8 +198,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         let warpTarget = 1, warpNow = 1;
         let warpMax = 1;
         let lastTel: ReturnType<typeof sim.earthTelemetry> | null = null;
-        let emaDt = 0.02, govAt = 0, gearPos = 1, gearDown = true;
-        let lastView: ViewMode = 'third', eventText = '', eventUntil = 0, raf = 0, last = performance.now(), acc = 0, hudAt = 0;
+        let emaDt = 0.02, govAt = 0, calmSince = 0, lastDown = -1e9, gearPos = 1, gearDown = true;
+        let lastView: ViewMode = 'third', eventText = '', eventUntil = 0, raf = 0, last = performance.now(), hudAt = 0;
         const rd = (n: number, d = 0) => Number(n.toFixed(d));
 
         const loop = (t: number) => {
@@ -210,10 +210,12 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           const f = flags.current;
           // frame-time governor
           emaDt += (Math.min(0.25, rawDt) - emaDt) * 0.08;
+          // Each change reallocates the canvas buffers (a visible hitch), so: step down at once when slow, step up only after a long calm spell, and never within 20 s of a step down.
           if (t - govAt > 1200) {
             govAt = t;
-            if (emaDt > 0.036 && pr > 0.45) { pr = Math.max(0.45, pr * 0.85); renderer.setPixelRatio(pr); fit(); }
-            else if (emaDt < 0.021 && pr < prMax) { pr = Math.min(prMax, pr * 1.1); renderer.setPixelRatio(pr); fit(); }
+            if (emaDt > 0.036 && pr > 0.45) { pr = Math.max(0.45, pr * 0.85); renderer.setPixelRatio(pr); fit(); calmSince = t; lastDown = t; }
+            else if (emaDt < 0.021 && pr < prMax && t - lastDown > 20000 && t - calmSince > 8000) { pr = Math.min(prMax, pr * 1.1); renderer.setPixelRatio(pr); fit(); calmSince = t; }
+            else if (emaDt >= 0.021) calmSince = t;
           }
           manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn;
 
@@ -239,10 +241,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             if (warpNow > 1) timeOffsetMs += dt * 1000 * (warpNow - 1); // the day and night pass at the same pace
           }
           if (!spawnInfo.pending) {
-            acc += dt;
-            let n = 0;
-            while (acc >= 1 / 60 && n++ < 6) { sim.stepEarth(state, input, warpNow / 60, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist }); acc -= 1 / 60; }
-            if (acc > 0.2) acc = 0;
+            // Sub-steps proportional to the real frame time (never a fixed 1/60 s quantum): the ship then moves smoothly whatever the frame rate, instead of 1, 2 or 3 steps per frame.
+            const n = Math.min(6, Math.max(1, Math.ceil(dt * 60 - 1e-6)));
+            for (let i = 0; i < n; i++) sim.stepEarth(state, input, (dt / n) * warpNow, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist });
           }
           if (state.event) {
             eventText = EVENT_TEXT[state.event.kind]; eventUntil = t + 4500;
