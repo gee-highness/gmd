@@ -342,7 +342,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     return () => { disposed = true; cleanup(); };
   }, []);
 
-  const glass = { bg: 'rgba(8,10,20,0.55)', border: '1px solid', borderColor: 'line.subtle', borderRadius: 'lg', backdropFilter: 'blur(8px)' } as const;
+  // On touch devices a blurred backdrop over a canvas that repaints every frame forces the browser to re-blur the live WebGL output each frame (a large, GPU-bound cost on phones), so the panels go slightly more opaque and unblurred instead.
+  const glass = { bg: isTouch ? 'rgba(8,10,20,0.72)' : 'rgba(8,10,20,0.55)', border: '1px solid', borderColor: 'line.subtle', borderRadius: 'lg', backdropFilter: isTouch ? 'none' : 'blur(8px)' } as const;
   const fmt = (v: number, d = 0) => v.toFixed(d);
   const goPlace = (id: string) => { setPlaceId(id); const p = placeById(id); if (p) actions.current?.teleport(p.lat, p.lon, p.heading); };
   const goCoords = () => {
@@ -355,7 +356,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const place = placeById(placeId);
 
   return (
-    <Box position="fixed" inset={0} bg="#0a0d14" data-testid="earth">
+    <Box position="fixed" inset={0} bg="#0a0d14" data-testid="earth" sx={isTouch ? { '& *': { backdropFilter: 'none !important' } } : undefined}>
       <Box ref={host} position="absolute" inset={0} data-testid="earth-canvas" />
       {error && <Flex position="absolute" inset={0} align="center" justify="center" px={6} textAlign="center" bg="#0a0d14"><Text color="content.secondary">Flying over Earth needs WebGL, and this device could not start it ({error}).</Text></Flex>}
       {!ready && !error && <Flex position="absolute" inset={0} align="center" justify="center" pointerEvents="none" bg="#0a0d14"><Text color="content.muted">Spinning up the planet…</Text></Flex>}

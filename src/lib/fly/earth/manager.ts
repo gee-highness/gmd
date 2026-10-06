@@ -60,6 +60,7 @@ export class EarthManager {
 	private buildQueue: { r: Rec; h: HeightTile; synthetic: boolean }[] = [];
 	private activeImages = 0;
 	private lastSelect = -1e9;
+	private lastPump = -1e9;
 	private selected: SelectedTile[] = [];
 	private underfoot: TileId[] = [];
 	private underfootKeys = new Set<string>();
@@ -131,7 +132,8 @@ export class EarthManager {
 		}
 		this.drainBuilds();
 		this.show(frame, now);
-		this.pump(now);
+		// Scheduling, eviction and stats scan every resident tile (and sort the wanted ones): 10 Hz is plenty and keeps the frame free on phones.
+		if (now - this.lastPump > 100) { this.lastPump = now; this.pump(now); }
 	}
 
 	// ---------------------------------------------------------------- planning
@@ -244,7 +246,7 @@ export class EarthManager {
 			const key = `${tileKey(res.tile)}`;
 			let base = this.textures.get(key);
 			if (!base) {
-				base = new THREE.Texture(res.image as HTMLImageElement); base.colorSpace = THREE.SRGBColorSpace; base.anisotropy = 4; base.generateMipmaps = true; base.minFilter = THREE.LinearMipmapLinearFilter; base.needsUpdate = true;
+				base = new THREE.Texture(res.image as HTMLImageElement); base.colorSpace = THREE.SRGBColorSpace; base.anisotropy = this.opts.cheapMaterials ? 1 : 4; base.generateMipmaps = true; base.minFilter = THREE.LinearMipmapLinearFilter; base.needsUpdate = true;
 				this.tracker.track(base, 'earth', 'texture', 256 * 256 * 4 * 1.33);
 				this.textures.set(key, base);
 			}
