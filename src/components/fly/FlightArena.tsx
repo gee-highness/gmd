@@ -26,6 +26,18 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
   const [levelAssist, setLevelAssist] = useState(true);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  // Game-style UI: help follows the device in use (hidden for a controller), the toolbar fades when the pointer is still, K brings help back.
+  const [inputKind, setInputKind] = useState<'keys' | 'pad'>('keys');
+  const [helpOpen, setHelpOpen] = useState(true);
+  const [awake, setAwake] = useState(true);
+  useEffect(() => { const t = window.setTimeout(() => setHelpOpen(false), 12_000); return () => window.clearTimeout(t); }, []);
+  useEffect(() => {
+    let t = 0;
+    const wake = () => { setAwake(true); window.clearTimeout(t); t = window.setTimeout(() => setAwake(false), 3500); };
+    wake();
+    window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
+    return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
+  }, []);
   const flags = useRef({ view, hoverAssist, levelAssist, gear: true });
   flags.current.view = view; flags.current.hoverAssist = hoverAssist; flags.current.levelAssist = levelAssist;
   const keys = useRef(new Set<string>());
@@ -35,6 +47,7 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
 
   // --- controller: sticks fly, buttons switch the view, gear and reset ---------------------------------
   usePadFrames(({ pad: p, pressed }) => {
+    if (Math.abs(p.lx) + Math.abs(p.ly) + Math.abs(p.rx) + Math.abs(p.ry) + p.l2 + p.r2 > 0.05 || p.down.l1 || p.down.r1) setInputKind('pad');
     padActive.current = Math.abs(p.lx) + Math.abs(p.ly) + Math.abs(p.rx) + Math.abs(p.ry) + p.l2 + p.r2 > 0.05 || p.down.l1 || p.down.r1;
     pad.current = {
       collective: p.r2 - p.l2, forward: -p.ly, strafe: p.lx, yaw: p.rx, pitch: p.ry, roll: (p.down.r1 ? 1 : 0) - (p.down.l1 ? 1 : 0),
@@ -143,7 +156,8 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
         const onKeyDown = (e: KeyboardEvent) => {
           if (e.ctrlKey || e.metaKey || e.altKey) return;
           const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-          if (['w', 'a', 's', 'd', 'q', 'e', ' ', 'Shift', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) { keys.current.add(k); e.preventDefault(); }
+          if (['w', 'a', 's', 'd', 'q', 'e', ' ', 'Shift', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) { keys.current.add(k); setInputKind('keys'); e.preventDefault(); }
+          else if (k === 'k') setHelpOpen((v) => !v);
           else if (k === 'v') actions.current?.view();
           else if (k === '1') setView('first');
           else if (k === '3') setView('third');
@@ -221,7 +235,7 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
 
       {!hideUi && (
         <>
-          <HStack position="absolute" top={3} left={3} spacing={2} wrap="wrap" maxW="calc(100% - 24px)">
+          <HStack position="absolute" top={3} left={3} spacing={2} wrap="wrap" maxW="calc(100% - 64px)" opacity={awake ? 1 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _focusWithin={{ opacity: 1, pointerEvents: 'auto' }}>
             <Button size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />} onClick={onBack}>Hangar</Button>
             <Flex {...glass} px={1} py={1} gap={1} role="group" aria-label="Camera view">
               <Button size="xs" variant={view === 'first' ? 'solid' : 'ghost'} aria-pressed={view === 'first'} onClick={() => setView('first')}>First person</Button>
@@ -229,7 +243,7 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
             </Flex>
           </HStack>
 
-          <Box {...glass} position="absolute" top={{ base: '96px', md: '60px' }} left={3} p={3} maxW="280px" fontSize="xs" color="content.secondary" data-testid="arena-help">
+          <Box {...glass} position="absolute" top={{ base: '96px', md: '60px' }} left={3} p={3} maxW="280px" fontSize="xs" color="content.secondary" display={helpOpen && inputKind === 'keys' ? 'block' : 'none'} data-testid="arena-help">
             <Text fontWeight={700} color="content.primary" mb={1}>Controls</Text>
             <Text><b>Space / Shift</b> climb / descend · <b>W S</b> thrust / retro · <b>A D</b> strafe</Text>
             <Text><b>Q E</b> yaw · <b>↑ ↓</b> pitch · <b>← →</b> roll</Text>
@@ -243,7 +257,7 @@ export default function FlightArena({ onBack }: { onBack: () => void }) {
 
           <Flex position="absolute" left={3} right={3} bottom={3} direction="column" align="center" gap={2} pointerEvents="none">
             {hud?.event && <Text {...glass} px={3} py={1} fontSize="sm" data-testid="arena-event">{hud.event}</Text>}
-            <Flex {...glass} px={4} py={2} gap={5} wrap="wrap" justify="center" fontFamily="mono" fontSize="sm" data-testid="arena-hud">
+            <Flex px={4} py={1} gap={5} wrap="wrap" justify="center" fontFamily="mono" fontSize="sm" color="white" textShadow="0 1px 6px rgba(0,0,0,0.9)" data-testid="arena-hud">
               <Text>SPD <b data-testid="hud-speed">{fmt(hud?.speed ?? 0)}</b> m/s</Text>
               <Text>ALT <b data-testid="hud-alt">{fmt(hud?.altitude ?? 0, 1)}</b> m</Text>
               <Text>V/S <b>{fmt(hud?.verticalSpeed ?? 0, 1)}</b> m/s</Text>

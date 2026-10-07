@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, Flex, Text } from '@chakra-ui/react';
+import { Button, Flex, IconButton, Text } from '@chakra-ui/react';
+import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import Hangar from './Hangar';
 import FlightArena from './FlightArena';
 import EarthFlight from './EarthFlight';
@@ -18,6 +19,15 @@ type Mode = 'hangar' | 'arena' | 'earth';
 export default function FlyApp() {
   const [mode, setMode] = useState<Mode>('hangar');
   const [full, setFull] = useState(false);
+  // The corner button only matters when you reach for it: it fades out a few seconds after the pointer stops (any pointer movement or touch brings it back).
+  const [awake, setAwake] = useState(true);
+  useEffect(() => {
+    let t = 0;
+    const wake = () => { setAwake(true); window.clearTimeout(t); t = window.setTimeout(() => setAwake(false), 3500); };
+    wake();
+    window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
+    return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
+  }, []);
   const isTouch = useTouchDevice();
   const { portrait, goLandscape } = useLandscape(isTouch);
 
@@ -55,10 +65,12 @@ export default function FlyApp() {
   return (
     <>
       {mode === 'earth' ? <EarthFlight onBack={() => go('hangar')} /> : mode === 'arena' ? <FlightArena onBack={() => go('hangar')} /> : <Hangar onFly={() => go('arena')} onEarth={() => go('earth')} />}
-      <Button
-        position="fixed" zIndex={30} size="sm" variant="glass" onClick={toggleFull} aria-pressed={full} aria-label={full ? 'Exit fullscreen' : 'Enter fullscreen'} data-testid="fullscreen-button"
-        bottom={isTouch ? '10px' : '12px'} left={isTouch ? '50%' : undefined} right={isTouch ? undefined : '12px'} transform={isTouch ? 'translateX(-50%)' : undefined}
-      >{full ? 'Exit fullscreen' : 'Fullscreen'}{isTouch ? '' : ' (F)'}</Button>
+      <IconButton
+        position="fixed" zIndex={30} size="sm" variant="glass" onClick={toggleFull} aria-pressed={full} aria-label={full ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)'} title={full ? 'Exit fullscreen (F)' : 'Fullscreen (F)'} data-testid="fullscreen-button"
+        icon={full ? <FiMinimize2 aria-hidden="true" /> : <FiMaximize2 aria-hidden="true" />}
+        top="10px" right="10px" minW="32px" h="32px" borderRadius="full"
+        opacity={awake ? 0.75 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _hover={{ opacity: 1 }} _focusVisible={{ opacity: 1, pointerEvents: 'auto' }}
+      />
       {isTouch && portrait && (
         <Flex position="fixed" inset={0} zIndex={2000} bg="rgba(8,10,20,0.97)" direction="column" align="center" justify="center" gap={4} px={8} textAlign="center" data-testid="rotate-overlay">
           <Text fontSize="4xl" aria-hidden="true">⟳</Text>

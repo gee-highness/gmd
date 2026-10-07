@@ -5,7 +5,7 @@ test.describe('/fly hangar: the Kestrel', () => {
     await page.goto('/fly');
     await expect(page.getByTestId('ship-card')).toContainText('Kestrel', { timeout: 60_000 });
     await expect(page.getByTestId('ship-card')).toContainText('Δv 14.9 km/s');
-    await expect(page.getByTestId('ship-card')).toContainText('original design');
+    await expect(page.getByTestId('ship-card')).toContainText('original bubble-canopy');
     await expect(page.getByRole('contentinfo')).toHaveCount(0); // bare route: no site footer
     await expect(page.getByTestId('hangar-canvas').locator('canvas')).toBeVisible({ timeout: 30_000 });
   });
@@ -54,6 +54,7 @@ test.describe('/fly arena: first and third person', () => {
     await expect(page.getByRole('button', { name: 'First person' })).toHaveAttribute('aria-pressed', 'true');
     await page.keyboard.press('v');
     await expect(page.getByRole('button', { name: 'Third person' })).toHaveAttribute('aria-pressed', 'true');
+    await page.mouse.move(200, 200); // the toolbar fades while the pointer is still; reaching for it brings it back
     await page.getByRole('button', { name: 'First person' }).click();
     await expect(page.getByRole('button', { name: 'First person' })).toHaveAttribute('aria-pressed', 'true');
   });

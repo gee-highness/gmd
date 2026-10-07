@@ -38,6 +38,20 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   useEffect(() => { const id = new URLSearchParams(window.location.search).get('place'); if (id && placeById(id)) setPlaceId(id); }, []);
   const [coords, setCoords] = useState('');
   const [coordError, setCoordError] = useState('');
+  // Game-style UI: the screen stays clear while you fly. Controls help follows the device in use (gone for a controller or touch),
+  // the toolbar fades when the pointer is still, and the detailed telemetry is a toggle (T).
+  const [inputKind, setInputKind] = useState<'keys' | 'pad'>('keys');
+  const [helpOpen, setHelpOpen] = useState(true);
+  const [details, setDetails] = useState(false);
+  const [awake, setAwake] = useState(true);
+  useEffect(() => { const t = window.setTimeout(() => setHelpOpen(false), 12_000); return () => window.clearTimeout(t); }, []);
+  useEffect(() => {
+    let t = 0;
+    const wake = () => { setAwake(true); window.clearTimeout(t); t = window.setTimeout(() => setAwake(false), 3500); };
+    wake();
+    window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
+    return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
+  }, []);
   const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn });
   flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn };
   const keys = useRef(new Set<string>());
@@ -49,6 +63,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
   usePadFrames(({ pad: p, pressed }) => {
     padActive.current = Math.abs(p.lx) + Math.abs(p.ly) + Math.abs(p.rx) + Math.abs(p.ry) + p.l2 + p.r2 > 0.05 || p.down.l1 || p.down.r1;
+    if (padActive.current) setInputKind('pad');
     pad.current = { collective: p.r2 - p.l2, forward: -p.ly, strafe: p.lx, yaw: p.rx, pitch: p.ry, roll: (p.down.r1 ? 1 : 0) - (p.down.l1 ? 1 : 0) };
     for (const c of pressed) {
       if (c === 'triangle') actions.current?.view();
@@ -169,7 +184,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           const target = e.target as HTMLElement | null;
           if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName)) return;
           const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-          if (['w', 'a', 's', 'd', 'q', 'e', ' ', 'Shift', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) { keys.current.add(k); e.preventDefault(); }
+          if (['w', 'a', 's', 'd', 'q', 'e', ' ', 'Shift', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) { keys.current.add(k); setInputKind('keys'); e.preventDefault(); }
+          else if (k === 'k') setHelpOpen((v) => !v);
+          else if (k === 't') setDetails((v) => !v);
           else if (k === 'v') actions.current?.view();
           else if (k === '1') setView('first');
           else if (k === '3') setView('third');
@@ -366,7 +383,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
       {!hideUi && ready && (
         <>
-          <HStack position="absolute" top={3} left={3} spacing={2} wrap="wrap" maxW="calc(100% - 24px)" align="start">
+          <Flex position="absolute" top={3} left={3} direction="column" align="start" gap={2} maxW="calc(100% - 64px)" pointerEvents="none">
+            <HStack spacing={2} wrap="wrap" align="start" opacity={awake ? 1 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _focusWithin={{ opacity: 1, pointerEvents: 'auto' }} data-testid="earth-toolbar">
             <Button size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />} onClick={onBack}>Hangar</Button>
             {!isTouch && <Flex {...glass} px={1} py={1} gap={1} role="group" aria-label="Camera view">
               <Button size="xs" variant={view === 'first' ? 'solid' : 'ghost'} aria-pressed={view === 'first'} onClick={() => setView('first')}>First person</Button>
@@ -382,9 +400,24 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               {!isTouch && <Button size="xs" onClick={goCoords}>Go</Button>}
             </Flex>
           </HStack>
-          {coordError && <Text position="absolute" top="52px" left={3} fontSize="xs" color="red.300" role="alert">{coordError}</Text>}
+            {coordError && <Text fontSize="xs" color="red.300" role="alert">{coordError}</Text>}
+            <Flex direction="column" gap={1} pointerEvents="none" maxW={isTouch ? '240px' : '320px'} fontSize={isTouch ? '10px' : undefined}>
+            {hud && !hud.underfoot && !hud.offline && <Text {...glass} px={3} py={1} fontSize="sm" data-testid="earth-loading">Loading the ground under {place?.name.split(',')[0] ?? 'you'}… {fmt(hud.terrainReady * 100)}%</Text>}
+            {hud && (() => {
+              // One quiet line instead of a box per missing data source (the full wording is the tooltip, and screen readers get it too).
+              const notes: string[] = [];
+              if (hud.offline) notes.push('terrain is flat sea level');
+              if (!isTouch && hud.imagery === 0 && hud.tiles > 0 && imageryOn) notes.push('ground colours are estimated');
+              if (!isTouch && hud.buildingsFailed && buildingsOn && hud.agl < 1500) notes.push('no 3D buildings');
+              if (!notes.length) return null;
+              return <Text {...glass} px={3} py={1} fontSize="xs" color="orange.200" title="Some map data could not be reached from here: the ground may be flat sea level instead of real terrain, with estimated colours and no 3D buildings." data-testid={hud.offline ? 'earth-offline' : 'earth-data-note'}>⚠ Live map data unreachable: {notes.join(' · ')}</Text>;
+            })()}
+            {hud && hud.buildings > 0 && <Text {...glass} px={3} py={1} fontSize="xs" color="content.muted" data-testid="earth-buildings">{hud.buildings} buildings (OpenStreetMap){hud.estimated > 0.05 ? `; heights guessed for ${fmt(hud.estimated * 100)}%` : ''}</Text>}
+          </Flex>
+          </Flex>
+          
 
-          {!isTouch && <Box {...glass} position="absolute" top={{ base: '130px', md: '60px' }} right={3} p={3} maxW="260px" fontSize="xs" color="content.secondary" data-testid="earth-help">
+          {!isTouch && helpOpen && inputKind === 'keys' && <Box {...glass} position="absolute" top={{ base: '130px', md: '56px' }} right={3} p={3} maxW="260px" fontSize="xs" color="content.secondary" data-testid="earth-help">
             <Text fontWeight={700} color="content.primary" mb={1}>Controls</Text>
             <Text><b>Space / Shift</b> climb / descend (airbrake in flight) · <b>W S</b> thrust / retro (throttle lever in flight) · <b>A D</b> strafe</Text>
             <Text><b>Q E</b> yaw · <b>↑ ↓</b> pitch · <b>← →</b> roll</Text>
@@ -400,13 +433,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             <Flex gap={1} mt={2} align="center"><Text>Time</Text><Button size="xs" onClick={() => actions.current?.timeShift(-1)} aria-label="One hour earlier">−1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift(1)} aria-label="One hour later">+1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift('now')}>Now</Button></Flex>
           </Box>}
 
-          <Flex position="absolute" top={isTouch ? '96px' : { base: '170px', md: '64px' }} left={3} direction="column" gap={1} pointerEvents="none" maxW={isTouch ? '240px' : '320px'} fontSize={isTouch ? '10px' : undefined}>
-            {hud && !hud.underfoot && !hud.offline && <Text {...glass} px={3} py={1} fontSize="sm" data-testid="earth-loading">Loading the ground under {place?.name.split(',')[0] ?? 'you'}… {fmt(hud.terrainReady * 100)}%</Text>}
-            {hud?.offline && <Text {...glass} px={3} py={1} fontSize="xs" color="orange.200" data-testid="earth-offline">Elevation data is unreachable from here: some ground is flat sea level, not real terrain.</Text>}
-            {!isTouch && hud && hud.imagery === 0 && hud.tiles > 0 && imageryOn && <Text {...glass} px={3} py={1} fontSize="xs" color="content.muted">Satellite imagery not available: colours are estimated from height, slope and latitude.</Text>}
-            {hud && hud.buildings > 0 && <Text {...glass} px={3} py={1} fontSize="xs" color="content.muted" data-testid="earth-buildings">{hud.buildings} buildings (OpenStreetMap){hud.estimated > 0.05 ? `; heights guessed for ${fmt(hud.estimated * 100)}%` : ''}</Text>}
-            {!isTouch && hud?.buildingsFailed && buildingsOn && hud.agl < 1500 && <Text {...glass} px={3} py={1} fontSize="xs" color="content.muted">Building data not reachable: no 3D buildings here.</Text>}
-          </Flex>
+          
 
           <Flex position="absolute" left={3} right={3} bottom={isTouch ? 'auto' : 3} top={isTouch ? '54px' : 'auto'} direction="column" align="center" gap={2} pointerEvents="none" fontSize={isTouch ? 'xs' : undefined}>
             {hud && hud.msl > 20_000 && (
@@ -419,12 +446,30 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             )}
             {hud?.event && <Text {...glass} px={3} py={1} fontSize="sm" data-testid="earth-event">{hud.event}</Text>}
             {hud && hud.heat > 25 && <Text {...glass} px={3} py={1} fontSize="sm" color="orange.200">Re-entry heating {fmt(hud.heat)} W/cm² (damage is not modelled yet)</Text>}
-            <Flex {...glass} px={4} py={2} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="sm" data-testid="earth-hud">
+            <Flex direction="column" align="center" gap={1} fontFamily="mono" color="white" textShadow="0 1px 6px rgba(0,0,0,0.9)" data-testid="earth-hud" pointerEvents="auto" cursor="pointer" role="button" tabIndex={0} aria-pressed={details} aria-label="Detailed telemetry (T)" onClick={() => setDetails((v) => !v)} onKeyDown={(e) => { if (e.key === 'Enter') setDetails((v) => !v); }}>
+              <Flex align="baseline" gap={{ base: 4, md: 6 }}>
+                <Text fontSize="xs" color="whiteAlpha.700">HDG <b>{fmt(hud?.heading ?? 0)}</b>°</Text>
+                <Text fontSize={isTouch ? 'xl' : '3xl'} fontWeight={700} lineHeight={1}>
+                  <span data-testid="hud-speed">{fmt(hud?.speed ?? 0)}</span><Text as="span" fontSize="xs" fontWeight={400} ml={1} color="whiteAlpha.700">m/s</Text>
+                  {hud && hud.mach >= 0.8 && <Text as="span" fontSize="sm" fontWeight={400} ml={2} color="orange.200">M {fmt(hud.mach, 1)}</Text>}
+                </Text>
+                <Text fontSize="xs" color="whiteAlpha.700">ALT <b data-testid="hud-agl">{hud && hud.agl >= 20_000 ? `${fmt(hud.agl / 1000, 0)} km` : `${fmt(hud?.agl ?? 0, hud && hud.agl < 100 ? 1 : 0)} m`}</b></Text>
+              </Flex>
+              <Flex gap={3} align="center" aria-hidden="true">
+                <Box w={{ base: '90px', md: '140px' }} h="2px" bg="whiteAlpha.300" borderRadius="full"><Box h="100%" w={`${Math.max(0, Math.min(1, hud?.fuel ?? 1)) * 100}%`} bg={(hud?.fuel ?? 1) < 0.15 ? 'red.300' : 'whiteAlpha.800'} borderRadius="full" /></Box>
+                {hud?.flight && <Box w={{ base: '50px', md: '80px' }} h="2px" bg="whiteAlpha.300" borderRadius="full"><Box h="100%" w={`${Math.max(0, Math.min(1, hud.throttle)) * 100}%`} bg="orange.300" borderRadius="full" /></Box>}
+              </Flex>
+              <VisuallyHidden>Fuel {fmt((hud?.fuel ?? 1) * 100)} percent{hud?.flight ? `, throttle ${fmt((hud?.throttle ?? 0) * 100)} percent` : ''}</VisuallyHidden>
+              {!isTouch && inputKind === 'keys' && <Text fontSize="10px" color="whiteAlpha.500">K controls · T details</Text>}
+            </Flex>
+            {details && (
+              <Flex direction="column" align="center" gap={2} pointerEvents="auto" data-testid="earth-details-panel">
+            <Flex {...glass} px={4} py={2} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="sm" data-testid="earth-details">
               <Text>LAT <b data-testid="hud-lat">{fmt(hud?.lat ?? 0, 4)}</b></Text>
               <Text>LON <b data-testid="hud-lon">{fmt(hud?.lon ?? 0, 4)}</b></Text>
               <Text>ALT <b data-testid="hud-msl">{fmt(hud?.msl ?? 0)}</b> m</Text>
-              <Text>AGL <b data-testid="hud-agl">{fmt(hud?.agl ?? 0, 1)}</b> m</Text>
-              <Text>SPD <b data-testid="hud-speed">{fmt(hud?.speed ?? 0)}</b> m/s</Text>
+              <Text>AGL <b data-testid="hud-agl-detail">{fmt(hud?.agl ?? 0, 1)}</b> m</Text>
+              <Text>SPD <b data-testid="hud-speed-detail">{fmt(hud?.speed ?? 0)}</b> m/s</Text>
               <Text>M <b>{fmt(hud?.mach ?? 0, 2)}</b></Text>
               <Text>V/S <b>{fmt(hud?.vs ?? 0, 1)}</b></Text>
               <Text>HDG <b>{fmt(hud?.heading ?? 0)}</b>°</Text>
@@ -432,14 +477,19 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               {hud && (hud.msl > 15_000 || hud.flight) && <Text>PITCH <b data-testid="hud-pitch">{fmt(hud.pitch)}</b>°</Text>}
               <Text>FUEL <b>{fmt((hud?.fuel ?? 1) * 100)}</b>%</Text>
             </Flex>
-            {!isTouch && <Flex {...glass} px={4} py={1} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="xs" color="content.muted" data-testid="earth-air">
+
+            <Flex {...glass} px={4} py={1} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="xs" color="content.muted" data-testid="earth-air">
               <Text>AIR {fmt(hud?.pressure ?? 101.3, 1)} kPa · {fmt(hud?.temperature ?? 15, 0)} °C · q {fmt(hud?.q ?? 0, 1)} kPa</Text>
               <Text>{hud?.utc} · Sun {fmt(hud?.sunElev ?? 0, 0)}°</Text>
               {hud?.space && <Text>IN SPACE</Text>}
-            </Flex>}
-            {!isTouch && <Text fontSize="10px" color="content.muted" textAlign="center" maxW="900px" data-testid="earth-credits">
+            </Flex>
+              </Flex>
+            )}
+            {(details || helpOpen) && !isTouch && (
+            <Text fontSize="10px" color="content.muted" alignSelf="flex-start" maxW={helpOpen && inputKind === 'keys' ? 'calc(100% - 290px)' : '900px'} data-testid="earth-credits">
               Elevation: Mapzen/AWS Terrain Tiles (SRTM, GEBCO and others) · Imagery: Sentinel-2 cloudless 2016 by EOX (CC BY 4.0), NASA GIBS Blue Marble · Buildings: © OpenStreetMap contributors (ODbL) · Sun: astronomy-engine · Atmosphere: US Standard 1976. No wind or weather yet.
-            </Text>}
+            </Text>
+            )}
           </Flex>
         </>
       )}

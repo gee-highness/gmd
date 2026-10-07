@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
-import { Box, Button, Checkbox, Flex, HStack, Slider, SliderFilledTrack, SliderThumb, SliderTrack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Button, Checkbox, Collapse, Flex, HStack, Slider, SliderFilledTrack, SliderThumb, SliderTrack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FiArrowLeft, FiCamera } from 'react-icons/fi';
 import { KESTREL, deltaV, thrustToWeight, G0 } from '@/lib/fly/ships/specs';
 import type { KestrelModel } from '@/lib/fly/ship/kestrel';
@@ -27,6 +27,7 @@ export default function Hangar({ onFly, onEarth }: { onFly?: () => void; onEarth
   const [gear, setGear] = useState(true);
   const [lights, setLights] = useState(true);
   const [spin, setSpin] = useState(true);
+  const [info, setInfo] = useState(false); // the ship card starts as just a name: specs open on demand so the ship stays in view
   const [view, setViewState] = useState<View>('three-quarter');
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -145,7 +146,11 @@ export default function Hangar({ onFly, onEarth }: { onFly?: () => void; onEarth
           <Button as={NextLink} href="/stars" size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />}>Back</Button>
         </HStack>
         <Box {...glass} mt={2} px={3} py={2} maxW="360px" pointerEvents="auto" data-testid="ship-card">
-          <Text fontFamily="heading" fontWeight={700} fontSize="xl">{KESTREL.name}</Text>
+          <Flex align="center" justify="space-between" gap={3}>
+            <Text fontFamily="heading" fontWeight={700} fontSize="xl">{KESTREL.name}</Text>
+            <Button size="xs" variant="ghost" onClick={() => setInfo((v) => !v)} aria-expanded={info} aria-controls="ship-specs">{info ? 'Hide specs' : 'Specs'}</Button>
+          </Flex>
+          <Collapse in={info} animateOpacity><Box id="ship-specs">
           <Text fontSize="sm" color="content.secondary">{KESTREL.blurb}</Text>
           <Flex gap={3} wrap="wrap" mt={2} fontSize="xs" color="content.muted">
             <Text>{KESTREL.dims.length} × {KESTREL.dims.span} × {KESTREL.dims.height} m</Text>
@@ -154,6 +159,7 @@ export default function Hangar({ onFly, onEarth }: { onFly?: () => void; onEarth
             <Text>TWR {thrustToWeight(KESTREL, 9.81).toFixed(1)} Earth · {thrustToWeight(KESTREL, 3.71).toFixed(1)} Mars</Text>
           </Flex>
           <Text fontSize="2xs" color="content.muted" mt={1}>An original bubble-canopy VTOL, laid out after the Oblivion-style reference sheets: glass cockpit, two spherical engine pods, ring-rotor tail. Vehicle numbers are gameplay values; the drive is fictional (Isp {KESTREL.isp} s, g₀ {G0} m/s²).</Text>
+          </Box></Collapse>
         </Box>
       </Box>
 
