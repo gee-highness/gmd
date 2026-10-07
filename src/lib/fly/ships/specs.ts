@@ -42,16 +42,17 @@ export const KESTREL: ShipSpec = {
 
 /**
  * Performance dial for the Earth flight (GAMEPLAY values). Main thrust ×10 gives ×10 acceleration; drag area ÷10 gives ×10 top speed in air
- * (terminal speed ∝ √(thrust / drag area)); Isp ×10 keeps propellant burn per second at the stock rate (ṁ = F/(Isp·g0)). Hover-lift engines
- * are left alone, so the VTOL feel is unchanged. `?perf=stock` in the URL flies the original numbers.
+ * (terminal speed ∝ √(thrust / drag area)). Propellant burn is ṁ = F/(Isp·g0), so Isp is raised by thrust × fuel: ×thrust keeps the burn per
+ * second at the stock rate despite the bigger engine, and ×fuel makes the tank last `fuel` times longer (done through Isp, not tank mass: a
+ * 10× tank would outweigh what the lift engines can hold up). Hover-lift engines are left alone, so the VTOL feel is unchanged. `?perf=stock` in the URL flies the original numbers.
  */
-export const PERFORMANCE = { thrust: 10, drag: 0.1, isp: 10 };
+export const PERFORMANCE = { thrust: 10, drag: 0.1, fuel: 10 };
 
 /** A copy of `spec` with the performance dial applied. */
 export function tuneShip(spec: ShipSpec, p: typeof PERFORMANCE = PERFORMANCE): ShipSpec {
 	return {
 		...spec,
-		isp: spec.isp * p.isp,
+		isp: spec.isp * p.thrust * p.fuel,
 		thrust: { ...spec.thrust, main: spec.thrust.main * p.thrust },
 		cdA: spec.cdA * p.drag,
 		perf: { drag: p.drag, thrust: p.thrust, speed: p.thrust },

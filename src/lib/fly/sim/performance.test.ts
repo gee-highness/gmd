@@ -25,11 +25,11 @@ describe('tuned Kestrel (PERFORMANCE dial)', () => {
 		expect(KESTREL_FAST.thrust.main).toBe(120_000 * PERFORMANCE.thrust);
 		expect(KESTREL_FAST.thrust.hover).toBe(KESTREL.thrust.hover);
 		expect(KESTREL_FAST.cdA).toBeCloseTo(KESTREL.cdA * PERFORMANCE.drag, 10);
-		expect(KESTREL_FAST.isp).toBe(KESTREL.isp * PERFORMANCE.isp);
+		expect(KESTREL_FAST.isp).toBe(KESTREL.isp * PERFORMANCE.thrust * PERFORMANCE.fuel);
 		expect(KESTREL_FAST.mass).toEqual(KESTREL.mass);
-		expect(deltaV(KESTREL_FAST) / deltaV(KESTREL)).toBeCloseTo(10, 6);
+		expect(deltaV(KESTREL_FAST) / deltaV(KESTREL)).toBeCloseTo(100, 6);
 		expect(thrustToWeight(KESTREL_FAST, 9.81)).toBeGreaterThan(thrustToWeight(KESTREL, 9.81) * 5);
-		expect(tuneShip(KESTREL, { thrust: 1, drag: 1, isp: 1 }).thrust).toEqual(KESTREL.thrust);
+		expect(tuneShip(KESTREL, { thrust: 1, drag: 1, fuel: 1 }).thrust).toEqual(KESTREL.thrust);
 	});
 
 	it('accelerates at least 10× harder (full throttle, 100 m/s, flight mode)', () => {
@@ -38,12 +38,13 @@ describe('tuned Kestrel (PERFORMANCE dial)', () => {
 		expect(gain(KESTREL_FAST)).toBeGreaterThan(100); // m/s², about 14 g at the engine, drag included
 	});
 
-	it('flies about 10× faster after the same time at full throttle, holding its altitude, at the same fuel burn', () => {
+	it('flies about 10× faster after the same time at full throttle, holding its altitude, on a tenth of the fuel', () => {
 		const run = (spec: typeof KESTREL) => { const s = cruise(spec, 1500, 100, 1); fly(s, spec, 300); return { v: s.vel.length(), h: geoOf(s.pos).h, fuel: earthTelemetry(s, sea, spec).fuelFraction }; };
 		const stock = run(KESTREL), fast = run(KESTREL_FAST);
 		expect(fast.v / stock.v).toBeGreaterThan(9); expect(fast.v / stock.v).toBeLessThan(12);
 		expect(Math.abs(fast.h - 1500)).toBeLessThan(300); // the flight assist still holds the path at Mach 5
-		expect(fast.fuel).toBeCloseTo(stock.fuel, 2); // Isp ×10 keeps the burn rate: faster, not thirstier
+		// the tank lasts 10× longer: a tenth of the propellant is burned over the same time, at 10× the speed
+		expect(1 - fast.fuel).toBeCloseTo((1 - stock.fuel) / PERFORMANCE.fuel, 2);
 	});
 
 	it('hover mode is no longer choked at 50 m/s: the limit scales with the dial', () => {
