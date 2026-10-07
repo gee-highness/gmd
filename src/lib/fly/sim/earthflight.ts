@@ -133,7 +133,7 @@ export function liftCoefficient(alpha: number): number {
 }
 
 /** In hover mode the forward thrust fades out between 30 and 50 m/s: the pods are configured for lift, so fast flight needs flight mode. */
-const HOVER_MODE_LIMIT = (vx: number) => Math.min(1, Math.max(0, (50 - vx) / 20));
+const HOVER_MODE_LIMIT = (vx: number, scale = 1) => Math.min(1, Math.max(0, (50 * scale - vx) / (20 * scale)));
 
 interface Body { fwd: Vec3; up: Vec3; right: Vec3; brake: number }
 
@@ -160,9 +160,10 @@ function accel(pos: Vec3, vel: Vec3, thrustPerMass: Vec3, spec: ShipSpec, mass: 
 			const dot = (u: Vec3) => vel[0] * u[0] + vel[1] * u[1] + vel[2] * u[2];
 			const vx = dot(body.fwd), vy = dot(body.up), vz = dot(body.right);
 			const half = 0.5 * rho * speed;
-			const cx = AERO.Cx * (1 + 3 * body.brake) * dragRise(speed / a.speedOfSound);
+			const dk = spec.perf?.drag ?? 1; // tuned ships: drag on every axis scales together (`cdA` already carries it for the vertical axis)
+			const cx = AERO.Cx * dk * (1 + 3 * body.brake) * dragRise(speed / a.speedOfSound);
 			// drag along each body axis
-			let fx = -half * cx * vx, fy = -half * spec.cdA * vy, fz = -half * AERO.Cz * vz;
+			let fx = -half * cx * vx, fy = -half * spec.cdA * vy, fz = -half * AERO.Cz * dk * vz;
 			// wing lift (along the body's up axis) and induced drag, from the angle of attack
 			if (vx > 0.5) {
 				const q = 0.5 * rho * vx * vx * AERO.S, cl = liftCoefficient(Math.atan2(-vy, vx));
@@ -268,10 +269,10 @@ function substep(s: EarthState, input: import('./flight').FlightInput, dt: numbe
 	hover = hasFuel ? Math.min(spec.thrust.hover, Math.max(0, hover)) : 0;
 	const mainCmd = flight
 		? (inp.forward < 0 && s.throttle <= 0.001 ? inp.forward * spec.thrust.main * RETRO_FRACTION : s.throttle * spec.thrust.main) // throttle lever; at idle, S swings the thrusters forward to brake
-		: inp.forward >= 0 ? inp.forward * spec.thrust.main * HOVER_MODE_LIMIT(vx) : inp.forward * spec.thrust.main * RETRO_FRACTION; // hover mode is speed-limited (30 → 50 m/s): switch to flight mode to go faster
+		: inp.forward >= 0 ? inp.forward * spec.thrust.main * HOVER_MODE_LIMIT(vx, spec.perf?.speed) : inp.forward * spec.thrust.main * RETRO_FRACTION; // hover mode is speed-limited (30 → 50 m/s): switch to flight mode to go faster
 	const main = hasFuel ? mainCmd : 0;
 	const brake = flight ? Math.max(0, -inp.collective) * (1 - blend) : 0; // Shift is the airbrake once the wings are carrying the ship
-	const rcs = hasFuel ? inp.strafe * RCS_FORCE : 0;
+	const rcs = hasFuel ? inp.strafe * RCS_FORCE * (spec.perf?.thrust ?? 1) : 0;
 	const tpm: Vec3 = [
 		(up.x * hover + fwd.x * main + right.x * rcs) / m,
 		(up.y * hover + fwd.y * main + right.y * rcs) / m,

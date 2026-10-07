@@ -23,6 +23,8 @@ export interface ShipSpec {
 	cdA: number;
 	landing: { minPad: number; maxSlopeDeg: number; maxVz: number };
 	crew: number;
+	/** Set by `tuneShip`: multipliers the flight model applies on top of the numbers above (drag on every body axis, thrust for RCS, speed for the hover-mode limit). */
+	perf?: { drag: number; thrust: number; speed: number };
 }
 
 export const KESTREL: ShipSpec = {
@@ -37,6 +39,27 @@ export const KESTREL: ShipSpec = {
 	landing: { minPad: 12, maxSlopeDeg: 15, maxVz: 4 },
 	crew: 2,
 };
+
+/**
+ * Performance dial for the Earth flight (GAMEPLAY values). Main thrust ×10 gives ×10 acceleration; drag area ÷10 gives ×10 top speed in air
+ * (terminal speed ∝ √(thrust / drag area)); Isp ×10 keeps propellant burn per second at the stock rate (ṁ = F/(Isp·g0)). Hover-lift engines
+ * are left alone, so the VTOL feel is unchanged. `?perf=stock` in the URL flies the original numbers.
+ */
+export const PERFORMANCE = { thrust: 10, drag: 0.1, isp: 10 };
+
+/** A copy of `spec` with the performance dial applied. */
+export function tuneShip(spec: ShipSpec, p: typeof PERFORMANCE = PERFORMANCE): ShipSpec {
+	return {
+		...spec,
+		isp: spec.isp * p.isp,
+		thrust: { ...spec.thrust, main: spec.thrust.main * p.thrust },
+		cdA: spec.cdA * p.drag,
+		perf: { drag: p.drag, thrust: p.thrust, speed: p.thrust },
+	};
+}
+
+/** The Kestrel as flown on Earth: stock airframe with the performance dial applied. */
+export const KESTREL_FAST: ShipSpec = tuneShip(KESTREL);
 
 /** Tsiolkovsky: Δv = Isp·g0·ln(m0/m1) at full tanks, m/s. */
 export const deltaV = (s: ShipSpec) => s.isp * G0 * Math.log((s.mass.dry + s.mass.propellant) / s.mass.dry);

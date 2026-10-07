@@ -8,7 +8,7 @@ import { usePadFrames } from '@/components/input/usePad';
 import { buttonName } from '@/lib/input/gamepad';
 import { CameraRig, type ViewMode } from '@/lib/fly/camera';
 import { podTargets } from '@/lib/fly/ship/pods';
-import { KESTREL } from '@/lib/fly/ships/specs';
+import { KESTREL, KESTREL_FAST } from '@/lib/fly/ships/specs';
 import { NO_INPUT, type FlightInput } from '@/lib/fly/sim/flight';
 import { PLACES, placeById } from '@/lib/fly/earth/places';
 import TouchControls from './TouchControls';
@@ -133,12 +133,13 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         scene.add(model.root);
 
         const params = new URLSearchParams(window.location.search);
+        const ship = params.get('perf') === 'stock' ? KESTREL : KESTREL_FAST; // ?perf=stock flies the original, slower numbers
         const startPlace = placeById(params.get('place') ?? '') ?? placeById('zurich')!;
         const start = { lat: num(params.get('lat'), startPlace.lat), lon: num(params.get('lon'), startPlace.lon), hdg: num(params.get('hdg'), startPlace.heading), alt: Math.max(0, num(params.get('alt'), 0)) };
         const t0Date = params.get('t') ? new Date(params.get('t')!) : new Date();
         let timeOffsetMs = Number.isNaN(t0Date.getTime()) ? 0 : t0Date.getTime() - Date.now();
 
-        const state = sim.spawnOnGround(start.lat, start.lon, start.hdg, 0);
+        const state = sim.spawnOnGround(start.lat, start.lon, start.hdg, 0, ship);
         const frame = new LocalFrame([state.pos.x, state.pos.y, state.pos.z]);
         const rig = new CameraRig('third', { reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches });
         let spawnInfo = { ...start, pending: true };
@@ -149,7 +150,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
         const teleport = (lat: number, lon: number, hdg: number, alt = 0) => {
           spawnInfo = { lat, lon, hdg, alt, pending: true };
-          Object.assign(state, sim.spawnOnGround(lat, lon, hdg, 0));
+          Object.assign(state, sim.spawnOnGround(lat, lon, hdg, 0, ship));
           frame.setAnchor([state.pos.x, state.pos.y, state.pos.z]);
           rig.snap(); gearDown = true; gearPos = 1;
         };
@@ -227,7 +228,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           // First seat on the real ground once the terrain under the spawn point has arrived.
           if (spawnInfo.pending && manager.stats.underfootReady) {
             const gh = Math.max(0, manager.terrain.height(geo.rad(spawnInfo.lat), geo.rad(spawnInfo.lon)) ?? 0);
-            Object.assign(state, sim.spawnOnGround(spawnInfo.lat, spawnInfo.lon, spawnInfo.hdg, gh));
+            Object.assign(state, sim.spawnOnGround(spawnInfo.lat, spawnInfo.lon, spawnInfo.hdg, gh, ship));
             if (spawnInfo.alt > 0) { const p = geo.geodeticToEcef(geo.rad(spawnInfo.lat), geo.rad(spawnInfo.lon), gh + spawnInfo.alt); state.pos.set(p[0], p[1], p[2]); state.landed = false; }
             frame.setAnchor([state.pos.x, state.pos.y, state.pos.z]); rig.snap();
             spawnInfo.pending = false;
@@ -243,7 +244,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           if (!spawnInfo.pending) {
             // Sub-steps proportional to the real frame time (never a fixed 1/60 s quantum): the ship then moves smoothly whatever the frame rate, instead of 1, 2 or 3 steps per frame.
             const n = Math.min(6, Math.max(1, Math.ceil(dt * 60 - 1e-6)));
-            for (let i = 0; i < n; i++) sim.stepEarth(state, input, (dt / n) * warpNow, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist });
+            for (let i = 0; i < n; i++) sim.stepEarth(state, input, (dt / n) * warpNow, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist, spec: ship });
           }
           if (state.event) {
             eventText = EVENT_TEXT[state.event.kind]; eventUntil = t + 4500;
@@ -258,7 +259,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           }
 
           frame.toLocal(state.pos, shipLocal); frame.quatToLocal(state.q, qLocal); frame.dirToLocal(state.vel, velLocal);
-          const tel = sim.earthTelemetry(state, manager.terrain); lastTel = tel;
+          const tel = sim.earthTelemetry(state, manager.terrain, ship); lastTel = tel;
           model.root.position.copy(shipLocal); model.root.quaternion.copy(qLocal);
           // Automatic landing gear: down below 15 m above the ground, up (and hidden) above 30 m.
           if (gearDown && tel.altitudeAgl > 30) gearDown = false; else if (!gearDown && tel.altitudeAgl < 15) gearDown = true;
