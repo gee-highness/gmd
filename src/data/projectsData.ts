@@ -25,6 +25,25 @@ export type Project = {
 export const projectsData: Project[] = [
     // FEATURED PROJECTS
     {
+        id: 'cmis-ai-decision-support',
+        name: 'CMIS AI Decision Support',
+        shortDescription: 'AI system in CMIS that identifies interrupted-in-treatment patients, with a privacy-preserving AI assistant for Power BI dashboards.',
+        longDescription: `AI decision support built for a client-management health information system (CMIS) at Palladium: Make It Possible.
+
+Key Features:
+• Interrupted-in-treatment: an AI system that identifies patients who have interrupted treatment so follow-up can be prioritised
+• Dashboard assistant: an AI model accompanies the Power BI dashboards and answers users' questions
+• MCP + DAX: the assistant reads data through a Model Context Protocol tool that generates DAX queries from the question and returns matching results
+• No database access: the model never connects to the database, only to the query tool
+• Privacy by design: processed, aggregated data is returned so personally identifiable information stays out of responses`,
+        tech: ['CMIS', 'Power BI', 'DAX', 'MCP', 'SQL Server', 'AI'],
+        year: 2026,
+        role: 'Software Engineer',
+        screenshotAlt: 'Architecture of the CMIS AI decision support system',
+        category: 'enterprise',
+        featured: true
+    },
+    {
         id: 'venda-khona',
         name: 'Venda Khona',
         shortDescription: 'Complete marketplace platform for Eswatini with buyer/seller tools and offline mode.',
