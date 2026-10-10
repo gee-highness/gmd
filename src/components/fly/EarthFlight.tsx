@@ -98,6 +98,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         const { loadTerrariumTile } = await import('@/lib/fly/earth/terrarium');
         const { LocalFrame } = await import('@/lib/fly/earth/frame');
         const { Dust } = await import('@/lib/fly/earth/dust');
+        const { PackSource } = await import('@/lib/fly/pack/reader');
+        const { makeOfflineFirstHeightLoader } = await import('@/lib/fly/pack/heights');
+        const { makeOfflineFirstImageLoader } = await import('@/lib/fly/pack/imagery');
         void atmo; void flight;
         if (disposed) return;
 
@@ -136,8 +139,15 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         scene.add(sky.mesh);
 
         const providers = imagery.DEFAULT_PROVIDERS;
-        const loadImage = loaders.makeImageLoader(providers);
-        const manager = new earth.EarthManager({ loadHeights: loadTerrariumTile, loadImage }, { tolerance: lowQ ? 5 : 3, maxTiles: lowQ ? 200 : 500, maxConcurrent: lowQ ? 4 : 6, maxBuildsPerFrame: lowQ ? 1 : 2, cheapMaterials: lowQ });
+        const networkLoadImage = loaders.makeImageLoader(providers);
+        // The offline world pack (docs/plan-offline-world.md) sits behind the network sources: real
+        // elevation/imagery wins when reachable, the pack answers instantly with no network at all
+        // and silently stands in whenever the network loader fails (offline, blocked, or just slow).
+        const terrainPack = new PackSource('/packs/world-terrain.pmtiles');
+        const albedoPack = new PackSource('/packs/world-albedo.pmtiles');
+        const loadHeights = makeOfflineFirstHeightLoader(terrainPack, loadTerrariumTile);
+        const loadImage = makeOfflineFirstImageLoader(albedoPack, networkLoadImage);
+        const manager = new earth.EarthManager({ loadHeights, loadImage }, { tolerance: lowQ ? 5 : 3, maxTiles: lowQ ? 200 : 500, maxConcurrent: lowQ ? 4 : 6, maxBuildsPerFrame: lowQ ? 1 : 2, cheapMaterials: lowQ });
         scene.add(manager.root);
         const buildings = new bl.BuildingsLayer({ fetchJson: bl.overpassFetch as never }, manager.tracker, (la, lo) => manager.field.height(lo, la), 16, lowQ);
         scene.add(buildings.root);

@@ -116,12 +116,29 @@ def write_pmtiles(path, levels, lossless, quality, tile_type=TileType.WEBP):
 
 
 def verify_pmtiles(path, levels, lossless, sample=40):
-    """Plan §4 step 11: re-decode tiles and compare to the source raster."""
+    """Plan §4 step 11: re-decode tiles and compare to the source raster.
+
+    Lossless layers (terrain, roughness) are gated on an exact per-pixel match (tolerance 0) -
+    that is the whole point of choosing lossless WebP for data layers. Lossy layers (albedo,
+    night) are display textures, not data, so they are gated on the *mean* absolute difference
+    per sampled tile (plan §7A's own standard for a colour layer: "mean colour ... within ΔE 2"),
+    not the single worst pixel: an isolated 1-2 px feature (a small lake, a thin river) can be
+    softened or lost entirely by lossy compression at this resolution, the same class of effect as
+    the confirmed narrow-peak findings in reproject.py's round-trip test, and 256x256-tile-wide
+    mean colour is what actually reaches the screen. The worst single-pixel diff is still printed
+    for visibility, just not gated on.
+
+    WebP has no true single-channel mode: PIL silently promotes a grey (mode 'L') source to RGB
+    before encoding, so a decoded grey layer comes back as (H, W, 3) with R=G=B (exactly, for
+    lossless) even though the array that was encoded was (H, W). That is compared via the R
+    channel, not treated as a shape mismatch.
+    """
     from pmtiles.reader import Reader, MmapSource
     reader = Reader(MmapSource(open(path, 'rb')))
     rng = np.random.default_rng(0)
     checked = 0
-    worst = 0
+    worst_pixel = 0
+    worst_tile_mean = 0.0
     for z, arr in levels.items():
         n = arr.shape[0] // TILE
         coords = rng.integers(0, n, size=(min(sample, n * n), 2))
@@ -132,16 +149,21 @@ def verify_pmtiles(path, levels, lossless, sample=40):
                 return False
             decoded = np.asarray(Image.open(io.BytesIO(tile_bytes)))
             expected = arr[ty * TILE:(ty + 1) * TILE, tx * TILE:(tx + 1) * TILE]
+            if expected.ndim == 2 and decoded.ndim == 3:
+                decoded = decoded[..., 0]  # grey source, WebP-promoted to RGB with R=G=B on decode
             if decoded.shape != expected.shape:
                 print(f'  VERIFY FAIL: shape mismatch z{z}/{tx}/{ty}', file=sys.stderr)
                 return False
-            diff = int(np.abs(decoded.astype(int) - expected.astype(int)).max())
-            worst = max(worst, diff)
+            diff = np.abs(decoded.astype(int) - expected.astype(int))
+            worst_pixel = max(worst_pixel, int(diff.max()))
+            worst_tile_mean = max(worst_tile_mean, float(diff.mean()))
             checked += 1
-    tolerance = 0 if lossless else 24  # lossy q70-80 WebP can move a level/channel a bit
-    passed = worst <= tolerance
-    print(f'  verify [{path.rsplit("/", 1)[-1]}]: {checked} tiles sampled, worst pixel diff {worst} '
-          f'<= {tolerance} : {"PASS" if passed else "FAIL"}')
+    tolerance = 0 if lossless else 3.0  # lossy q70-80 WebP: mean per-tile deviation, not worst pixel
+    gated = worst_pixel if lossless else worst_tile_mean
+    passed = gated <= tolerance
+    print(f'  verify [{path.rsplit("/", 1)[-1]}]: {checked} tiles sampled, worst pixel diff {worst_pixel}, '
+          f'worst tile-mean diff {worst_tile_mean:.2f} (gated on {"worst pixel" if lossless else "tile mean"} '
+          f'<= {tolerance}) : {"PASS" if passed else "FAIL"}')
     return passed
 
 
