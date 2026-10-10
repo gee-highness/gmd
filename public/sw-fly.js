@@ -21,6 +21,19 @@ const PACK_PATH_PREFIX = '/packs/';
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
+			// The SW does not control the page that registered it until the *next* navigation, so the
+			// very first visit's /fly document is never seen by the fetch handler below and would
+			// otherwise be missing from the cache the first time the device goes offline. Precache it
+			// explicitly here, the same way an app-shell precache would.
+			const shell = await caches.open(SHELL_CACHE);
+			try {
+				const docRes = await fetch('/fly', { cache: 'no-store' });
+				if (docRes.ok) await shell.put('/fly', docRes);
+			} catch {
+				// offline at install time: nothing to precache now, the fetch handler's cache fallback
+				// will serve whatever a previous install already stored.
+			}
+
 			const cache = await caches.open(PACK_CACHE);
 			try {
 				const manifestRes = await fetch(PACK_PATH_PREFIX + 'manifest.json', { cache: 'no-store' });
@@ -67,13 +80,50 @@ self.addEventListener('fetch', (event) => {
 	}
 });
 
+/**
+ * pmtiles reads tiles via byte-range `fetch()` calls, and its FetchSource explicitly rejects a 200
+ * response whose Content-Length exceeds the requested range (it has no way to know whether a
+ * range-ignorant server sent the whole file by mistake). The Cache API has no native Range
+ * support: cache.match() always returns the whole stored response as a plain 200. So the pack
+ * cache always stores exactly one full-file 200 entry per URL (keyed by the URL alone, ignoring
+ * any Range header, so different ranges for the same file share one entry instead of each
+ * overwriting it with a mismatched partial response), and every read - cache hit or a fresh
+ * network fetch - is sliced here into a proper 206 Partial Content response when the request asked
+ * for a range. That is what makes offline pmtiles reads actually work, not just the raw fetch.
+ */
 async function cacheFirst(request, cacheName) {
 	const cache = await caches.open(cacheName);
-	const cached = await cache.match(request);
-	if (cached) return cached;
-	const res = await fetch(request);
-	if (res.ok) cache.put(request, res.clone());
-	return res;
+	let full = await cache.match(request.url);
+	if (!full) {
+		const headers = new Headers(request.headers);
+		headers.delete('range');
+		const res = await fetch(new Request(request.url, { headers }));
+		if (!res.ok) return res;
+		await cache.put(request.url, res.clone());
+		full = res;
+	}
+	const range = request.headers.get('range');
+	return range ? sliceRange(full, range) : full;
+}
+
+async function sliceRange(response, rangeHeader) {
+	const buf = await response.clone().arrayBuffer();
+	const total = buf.byteLength;
+	const m = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
+	if (!m) return response;
+	const start = parseInt(m[1], 10);
+	const end = m[2] ? Math.min(parseInt(m[2], 10), total - 1) : total - 1;
+	const slice = buf.slice(start, end + 1);
+	return new Response(slice, {
+		status: 206,
+		statusText: 'Partial Content',
+		headers: {
+			'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream',
+			'Content-Range': `bytes ${start}-${end}/${total}`,
+			'Content-Length': String(slice.byteLength),
+			'Accept-Ranges': 'bytes',
+		},
+	});
 }
 
 async function networkFirst(request, cacheName) {
