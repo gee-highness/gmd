@@ -15,6 +15,8 @@ import { PLACES, placeById } from '@/lib/fly/earth/places';
 import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import { computeWarnings } from '@/lib/fly/warnings';
+import { type FlightLogEntry, appendLogEntry, loadLog, nearestPlace } from '@/lib/fly/log';
+import { type Badge, computeBadges, loadAchievements, recordLanding, recordTick } from '@/lib/fly/achievements';
 import TouchControls from './TouchControls';
 import { useTouchDevice } from './useLandscape';
 import PlaceSearch from './PlaceSearch';
@@ -46,6 +48,10 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [minimapOn, setMinimapOn] = useState(settings.minimapOn);
   const [reducedMotionPref, setReducedMotionPref] = useState(settings.reducedMotion);
   const [reality, setReality] = useState(settings.reality);
+  const [logbookOpen, setLogbookOpen] = useState(false);
+  const [logEntries, setLogEntries] = useState<FlightLogEntry[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const openLogbook = () => { setLogEntries(loadLog().slice().reverse()); setBadges(computeBadges(loadAchievements())); setLogbookOpen(true); };
   const [paused, setPaused] = useState(false);
   const [crashInfo, setCrashInfo] = useState<{ speed: number; maxVz: number } | null>(null);
   const [trail, setTrail] = useState<[number, number][]>([]);
@@ -229,6 +235,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           frame.setAnchor([state.pos.x, state.pos.y, state.pos.z]);
           rig.snap(); gearDown = true; gearPos = 1;
           trailBuf.length = 0; setTrail([]); // a new takeoff starts a new trail, not a line across the globe from wherever the last one ended
+          flightStartMs = performance.now(); // the logbook's flight-time field (docs/plan-fly-game-ux.md §4) counts from here
         };
         actions.current = {
           respawn: () => teleport(spawnInfo.lat, spawnInfo.lon, spawnInfo.hdg, 0),
@@ -280,7 +287,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         let warpMax = 1;
         let lastTel: ReturnType<typeof sim.earthTelemetry> | null = null;
         let emaDt = 0.02, govAt = 0, calmSince = 0, lastDown = -1e9, gearPos = 1, gearDown = true;
-        let lastView: ViewMode = 'third', eventText = '', eventUntil = 0, raf = 0, last = performance.now(), hudAt = 0;
+        let lastView: ViewMode = 'third', eventText = '', eventUntil = 0, raf = 0, last = performance.now(), hudAt = 0, flightStartMs = performance.now();
         const trailBuf: [number, number][] = []; // flight trail (docs/plan-fly-map-data.md §3): bounded ring buffer, synced to React state on each HUD tick
         const rd = (n: number, d = 0) => Number(n.toFixed(d));
 
@@ -328,14 +335,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             const n = Math.min(6, Math.max(1, Math.ceil(dt * 60 - 1e-6)));
             for (let i = 0; i < n; i++) sim.stepEarth(state, input, (dt / n) * warpNow, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist, spec: ship });
           }
-          if (state.event) {
-            if (state.event.kind === 'crash') {
-              // A recall card (below) explains what happened and waits for the pilot to dismiss it, instead of the
-              // old silent instant respawn - the physics step is gated on f.crashed above, so the ship holds still.
-              setCrashInfo({ speed: state.event.speed, maxVz: ship.landing.maxVz });
-            } else { eventText = EVENT_TEXT[state.event.kind]; eventUntil = t + 4500; }
-            state.event = null;
-          }
+          const pendingEvent = state.event; // read before telemetry (below) so logging has both; cleared once tel exists
 
           // Re-base the render frame near the ship.
           if (frame.needsRebase(state.pos)) {
@@ -346,6 +346,19 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
           frame.toLocal(state.pos, shipLocal); frame.quatToLocal(state.q, qLocal); frame.dirToLocal(state.vel, velLocal);
           const tel = sim.earthTelemetry(state, manager.terrain, ship); lastTel = tel;
+          if (pendingEvent) {
+            // Logbook + badges (docs/plan-fly-game-ux.md §4): every field here is a number the sim already
+            // computed for this touchdown - no separate scoring system.
+            const place = nearestPlace(tel.lat, tel.lon, PLACES);
+            appendLogEntry({ date: new Date().toISOString(), kind: pendingEvent.kind, touchdownSpeed: pendingEvent.speed, fuelUsedFraction: 1 - tel.fuelFraction, distanceKm: trailDistanceDeg(trailBuf) / 1000, flightTimeS: (t - flightStartMs) / 1000, place });
+            if (pendingEvent.kind !== 'crash') recordLanding(place);
+            if (pendingEvent.kind === 'crash') {
+              // A recall card (below) explains what happened and waits for the pilot to dismiss it, instead of the
+              // old silent instant respawn - the physics step is gated on f.crashed above, so the ship holds still.
+              setCrashInfo({ speed: pendingEvent.speed, maxVz: ship.landing.maxVz });
+            } else { eventText = EVENT_TEXT[pendingEvent.kind]; eventUntil = t + 4500; }
+            state.event = null;
+          }
           model.root.position.copy(shipLocal); model.root.quaternion.copy(qLocal);
           // Automatic landing gear: down below 15 m above the ground, up (and hidden) above 30 m.
           if (gearDown && tel.altitudeAgl > 30) gearDown = false; else if (!gearDown && tel.altitudeAgl < 15) gearDown = true;
@@ -406,6 +419,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             hudAt = t;
             const bs = buildings.stats;
             if (!spawnInfo.pending) {
+              recordTick(tel.mach, tel.altitudeAgl, tel.orbit.inOrbit);
               const last2 = trailBuf[trailBuf.length - 1];
               if (!last2 || Math.hypot(tel.lat - last2[0], tel.lon - last2[1]) > 1e-5) { // skip near-duplicate points (parked on the ground)
                 trailBuf.push([tel.lat, tel.lon]);
@@ -608,7 +622,34 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           </Box>
         </Flex>
       )}
-      {paused && ready && !crashed && (
+      {logbookOpen && ready && (
+        <Flex position="absolute" inset={0} align="center" justify="center" bg="blackAlpha.700" zIndex={22} data-testid="earth-logbook">
+          <Box {...glass} p={6} w="min(92vw, 480px)" maxH="80vh" overflowY="auto" role="dialog" aria-modal="true" aria-label="Logbook">
+            <Text fontWeight={700} fontSize="lg" mb={3}>Logbook</Text>
+            <Text fontSize="sm" fontWeight={600} color="content.secondary" mb={1}>Badges</Text>
+            <Stack spacing={1} mb={4}>
+              {badges.map((b) => (
+                <HStack key={b.id} justify="space-between" fontSize="sm">
+                  <Text color={b.achieved ? 'content.primary' : 'content.muted'}>{b.achieved ? '✓' : '○'} {b.label}</Text>
+                  {b.progress && <Text color="content.muted" fontSize="xs">{b.progress}</Text>}
+                </HStack>
+              ))}
+            </Stack>
+            <Text fontSize="sm" fontWeight={600} color="content.secondary" mb={1}>Recent flights</Text>
+            {logEntries.length === 0 && <Text fontSize="sm" color="content.muted" mb={3}>No landings recorded yet.</Text>}
+            <Stack spacing={2} mb={4} fontSize="xs" fontFamily="mono">
+              {logEntries.slice(0, 10).map((e, i) => (
+                <HStack key={i} justify="space-between" color={e.kind === 'crash' ? 'red.300' : e.kind === 'rough' ? 'orange.300' : 'content.secondary'}>
+                  <Text>{e.kind.toUpperCase()} {e.place ? `· ${placeById(e.place)?.name.split(',')[0] ?? e.place}` : ''}</Text>
+                  <Text>{fmt(e.touchdownSpeed, 1)} m/s · {fmt(e.distanceKm, 0)} km · {fmt(e.flightTimeS / 60, 1)} min</Text>
+                </HStack>
+              ))}
+            </Stack>
+            <Button onClick={() => setLogbookOpen(false)}>Close</Button>
+          </Box>
+        </Flex>
+      )}
+      {paused && ready && !crashed && !logbookOpen && (
         <Flex position="absolute" inset={0} align="center" justify="center" bg="blackAlpha.700" zIndex={20} data-testid="earth-pause">
           <Box {...glass} p={6} w="min(92vw, 360px)" role="dialog" aria-modal="true" aria-label="Paused">
             <Text fontWeight={700} fontSize="lg" mb={4}>Paused</Text>
@@ -631,6 +672,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
                 </Select>
                 <Text fontSize="xs" color="content.muted" mt={1}>Sets Hover assist and Level assist; you can still toggle either one in Controls afterward.</Text>
               </Box>
+              <Button variant="outline" onClick={openLogbook}>Logbook</Button>
               <Button variant="outline" onClick={onBack}>Exit to hangar</Button>
             </Stack>
             <Text fontSize="xs" color="content.muted">Esc to resume · the ship holds its position while paused</Text>
