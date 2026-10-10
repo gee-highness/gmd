@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Box, Button, Checkbox, Flex, HStack, Input, Select, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FiArrowLeft } from 'react-icons/fi';
 import { usePadFrames } from '@/components/input/usePad';
@@ -13,6 +14,8 @@ import { NO_INPUT, type FlightInput } from '@/lib/fly/sim/flight';
 import { PLACES, placeById } from '@/lib/fly/earth/places';
 import TouchControls from './TouchControls';
 import { useTouchDevice } from './useLandscape';
+
+const Minimap = dynamic(() => import('./Minimap'), { ssr: false });
 
 interface Hud {
   lat: number; lon: number; msl: number; agl: number; speed: number; vs: number; heading: number; mach: number; fuel: number; mass: number;
@@ -33,6 +36,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [buildingsOn, setBuildingsOn] = useState(true);
   const [imageryOn, setImageryOn] = useState(true);
   const [labelsOn, setLabelsOn] = useState(false);
+  const [minimapOn, setMinimapOn] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
@@ -231,6 +235,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           else if (k === '.' || k === '>') actions.current?.warp(1);
           else if (k === ',' || k === '<') actions.current?.warp(-1);
           else if (k === 'h') setHoverAssist((v) => !v);
+          else if (k === 'm') setMinimapOn((v) => !v);
           else if (k === '[') actions.current?.timeShift(e.shiftKey ? -6 : -1);
           else if (k === ']') actions.current?.timeShift(e.shiftKey ? 6 : 1);
           else if (k === '{') actions.current?.timeShift(-6);
@@ -468,6 +473,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               <Checkbox size="sm" isChecked={imageryOn} onChange={(e) => setImageryOn(e.target.checked)}>Satellite imagery</Checkbox>
               <Checkbox size="sm" isChecked={buildingsOn} onChange={(e) => setBuildingsOn(e.target.checked)}>Buildings</Checkbox>
               <Checkbox size="sm" isChecked={labelsOn} isDisabled={!imageryOn} onChange={(e) => setLabelsOn(e.target.checked)}>Street names</Checkbox>
+              <Checkbox size="sm" isChecked={minimapOn} onChange={(e) => setMinimapOn(e.target.checked)}>Minimap (M)</Checkbox>
             </Flex>
             <Flex gap={1} mt={2} align="center"><Text>Time</Text><Button size="xs" onClick={() => actions.current?.timeShift(-1)} aria-label="One hour earlier">−1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift(1)} aria-label="One hour later">+1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift('now')}>Now</Button></Flex>
           </Box>}
@@ -530,6 +536,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             </Text>
             )}
           </Flex>
+          {minimapOn && hud && <Minimap lat={hud.lat} lon={hud.lon} heading={hud.heading} agl={hud.agl} glass={glass} />}
         </>
       )}
       {isTouch && ready && <TouchControls input={touchInput} actions={() => actions.current} />}
