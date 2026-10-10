@@ -1,0 +1,51 @@
+{
+  "version": "2026.10.10",
+  "attribution": [
+    {
+      "id": "inputs",
+      "text": "Elevation, land/water and night-light rasters: origin unconfirmed (plan \u00a717 decision 3)",
+      "licence": "unconfirmed - keep private until confirmed"
+    }
+  ],
+  "tiers": {
+    "lite": {
+      "bytes": 55178002,
+      "files": [
+        "world-terrain.pmtiles",
+        "world-albedo.pmtiles",
+        "world-night.pmtiles",
+        "world-roughness.pmtiles"
+      ]
+    }
+  },
+  "files": {
+    "world-terrain.pmtiles": {
+      "path": "world-terrain.pmtiles",
+      "bytes": 43478094,
+      "sha256": "b2fc30837562758089f3f3e10e7755d1df5af284ad12385cdab0d8a7084c56f7",
+      "minZoom": 0,
+      "maxZoom": 6
+    },
+    "world-albedo.pmtiles": {
+      "path": "world-albedo.pmtiles",
+      "bytes": 5820937,
+      "sha256": "859696da5dce401fd287c0eff060d819a7cd5ef5ab7c75efa0976c69915ea317",
+      "minZoom": 0,
+      "maxZoom": 6
+    },
+    "world-night.pmtiles": {
+      "path": "world-night.pmtiles",
+      "bytes": 1987195,
+      "sha256": "7f5e932f2ff82a3d2815c6a27c6ff0f4ea6c4dddb8986698ad646c0f9aa67c57",
+      "minZoom": 0,
+      "maxZoom": 6
+    },
+    "world-roughness.pmtiles": {
+      "path": "world-roughness.pmtiles",
+      "bytes": 3891776,
+      "sha256": "e1054fed6ad5d92a7bc237538146cfff9d7f21c0514bc3c8d2d354a4983ea801",
+      "minZoom": 0,
+      "maxZoom": 5
+    }
+  }
+}

@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     default: `${profile.name} · ${profile.title}`,
     template: `%s · ${profile.name}`,
   },
-  description: `${profile.name} is a full-stack software developer. Explore projects, experience and get in touch.`,
+  description: `${profile.name} is a health data and AI engineer and full-stack software developer. Explore projects, experience and get in touch.`,
   applicationName: profile.name,
   authors: [{ name: profile.name, url: profile.github.url }],
   manifest: '/manifest.json',

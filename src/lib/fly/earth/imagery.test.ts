@@ -24,4 +24,11 @@ describe('imagery tile mapping', () => {
 		const a = ancestors({ z: 4, x: 9, y: 6 });
 		expect(a.map((t) => t.z)).toEqual([3, 2, 1, 0]); expect(a[0]).toEqual({ z: 3, x: 4, y: 3 });
 	});
+	it('the label overlay is standard XYZ (z/x/y), and its maxZoom covers every terrain zoom', async () => {
+		const { OSM_LABELS } = await import('./imagery');
+		expect(OSM_LABELS.url({ z: 5, x: 17, y: 11 })).toContain('/5/17/11.png');
+		expect(OSM_LABELS.maxZoom).toBeGreaterThanOrEqual(13); // MAX_TERRAIN_ZOOM (manager.ts)
+		expect(OSM_LABELS.attribution).toMatch(/OpenStreetMap/);
+		expect(DEFAULT_PROVIDERS).not.toContain(OSM_LABELS); // overlay, not a base imagery provider
+	});
 });

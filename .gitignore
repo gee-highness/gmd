@@ -44,3 +44,10 @@ next-env.d.ts
 # test output
 /test-results/
 /playwright-report/
+
+# world-pack builder: large intermediates and generated packs, not shipped
+/tools/world-pack/out/
+/tools/world-pack/exp/
+/tools/offline-world-prototype/exp/
+__pycache__/
+*.pyc

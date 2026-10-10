@@ -32,12 +32,33 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [levelAssist, setLevelAssist] = useState(true);
   const [buildingsOn, setBuildingsOn] = useState(true);
   const [imageryOn, setImageryOn] = useState(true);
+  const [labelsOn, setLabelsOn] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
   useEffect(() => { const id = new URLSearchParams(window.location.search).get('place'); if (id && placeById(id)) setPlaceId(id); }, []);
   const [coords, setCoords] = useState('');
   const [coordError, setCoordError] = useState('');
+  // Offline world pack (docs/plan-offline-world.md §11): register the /fly-scoped service worker
+  // once on mount (independent of the WebGL scene below), and offer a manual "check for updates"
+  // that re-syncs packs/manifest.json whenever the device is online.
+  const [packUpdate, setPackUpdate] = useState<'idle' | 'checking' | 'available' | 'current'>('idle');
+  const swReg = useRef<ServiceWorkerRegistration | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { registerFlyServiceWorker } = await import('@/lib/fly/pack/offline');
+      const reg = await registerFlyServiceWorker();
+      if (!cancelled && reg) swReg.current = reg;
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const checkForUpdates = async () => {
+    setPackUpdate('checking');
+    const { checkForPackUpdate } = await import('@/lib/fly/pack/offline');
+    const { changed } = await checkForPackUpdate(swReg.current);
+    setPackUpdate(changed.length ? 'available' : 'current');
+  };
   // Game-style UI: the screen stays clear while you fly. Controls help follows the device in use (gone for a controller or touch),
   // the toolbar fades when the pointer is still, and the detailed telemetry is a toggle (T).
   const [inputKind, setInputKind] = useState<'keys' | 'pad'>('keys');
@@ -52,8 +73,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
     return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
   }, []);
-  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn });
-  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn };
+  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn });
+  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn };
   const keys = useRef(new Set<string>());
   const pad = useRef<FlightInput>({ ...NO_INPUT });
   const touchInput = useRef<FlightInput>({ ...NO_INPUT });
@@ -98,6 +119,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         const { loadTerrariumTile } = await import('@/lib/fly/earth/terrarium');
         const { LocalFrame } = await import('@/lib/fly/earth/frame');
         const { Dust } = await import('@/lib/fly/earth/dust');
+        const { PackSource } = await import('@/lib/fly/pack/reader');
+        const { makeOfflineFirstHeightLoader } = await import('@/lib/fly/pack/heights');
+        const { makeOfflineFirstImageLoader } = await import('@/lib/fly/pack/imagery');
         void atmo; void flight;
         if (disposed) return;
 
@@ -136,8 +160,19 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         scene.add(sky.mesh);
 
         const providers = imagery.DEFAULT_PROVIDERS;
-        const loadImage = loaders.makeImageLoader(providers);
-        const manager = new earth.EarthManager({ loadHeights: loadTerrariumTile, loadImage }, { tolerance: lowQ ? 5 : 3, maxTiles: lowQ ? 200 : 500, maxConcurrent: lowQ ? 4 : 6, maxBuildsPerFrame: lowQ ? 1 : 2, cheapMaterials: lowQ });
+        // Street/place names are a label overlay composited onto the satellite tile, live-toggled without rebuilding
+        // the loader; like the OSM_STREETS layer in mapLayers.ts, it needs a network, so it wraps the network loader,
+        // never the offline pack (the pack's bundled imagery has no matching label data).
+        const labelsOnRef = { current: false }; // synced from flags.current every frame, below, like imageryEnabled/buildings.enabled
+        const networkLoadImage = loaders.makeLabeledImageLoader(loaders.makeImageLoader(providers), imagery.OSM_LABELS, () => labelsOnRef.current);
+        // The offline world pack (docs/plan-offline-world.md) sits behind the network sources: real
+        // elevation/imagery wins when reachable, the pack answers instantly with no network at all
+        // and silently stands in whenever the network loader fails (offline, blocked, or just slow).
+        const terrainPack = new PackSource('/packs/world-terrain.pmtiles');
+        const albedoPack = new PackSource('/packs/world-albedo.pmtiles');
+        const loadHeights = makeOfflineFirstHeightLoader(terrainPack, loadTerrariumTile);
+        const loadImage = makeOfflineFirstImageLoader(albedoPack, networkLoadImage);
+        const manager = new earth.EarthManager({ loadHeights, loadImage }, { tolerance: lowQ ? 5 : 3, maxTiles: lowQ ? 200 : 500, maxConcurrent: lowQ ? 4 : 6, maxBuildsPerFrame: lowQ ? 1 : 2, cheapMaterials: lowQ });
         scene.add(manager.root);
         const buildings = new bl.BuildingsLayer({ fetchJson: bl.overpassFetch as never }, manager.tracker, (la, lo) => manager.field.height(lo, la), 16, lowQ);
         scene.add(buildings.root);
@@ -235,7 +270,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             else if (emaDt < 0.021 && pr < prMax && t - lastDown > 20000 && t - calmSince > 8000) { pr = Math.min(prMax, pr * 1.1); renderer.setPixelRatio(pr); fit(); calmSince = t; }
             else if (emaDt >= 0.021) calmSince = t;
           }
-          manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn;
+          manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn; labelsOnRef.current = f.labelsOn;
 
           const kin = keyboardInput(), pin = pad.current;
           const tin = touchInput.current;
@@ -386,6 +421,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           <Flex position="absolute" top={3} left={3} direction="column" align="start" gap={2} maxW="calc(100% - 64px)" pointerEvents="none">
             <HStack spacing={2} wrap="wrap" align="start" opacity={awake ? 1 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _focusWithin={{ opacity: 1, pointerEvents: 'auto' }} data-testid="earth-toolbar">
             <Button size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />} onClick={onBack}>Hangar</Button>
+            {!isTouch && <Button size="xs" variant={packUpdate === 'available' ? 'solid' : 'glass'} colorScheme={packUpdate === 'available' ? 'green' : undefined} isLoading={packUpdate === 'checking'} onClick={() => (packUpdate === 'available' ? window.location.reload() : void checkForUpdates())} data-testid="pack-update-button">
+              {packUpdate === 'available' ? 'Offline world updated – reload' : packUpdate === 'current' ? 'Offline world up to date' : 'Check for offline updates'}
+            </Button>}
             {!isTouch && <Flex {...glass} px={1} py={1} gap={1} role="group" aria-label="Camera view">
               <Button size="xs" variant={view === 'first' ? 'solid' : 'ghost'} aria-pressed={view === 'first'} onClick={() => setView('first')}>First person</Button>
               <Button size="xs" variant={view === 'third' ? 'solid' : 'ghost'} aria-pressed={view === 'third'} onClick={() => setView('third')}>Third person</Button>
@@ -429,6 +467,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               <Checkbox size="sm" isChecked={levelAssist} onChange={(e) => setLevelAssist(e.target.checked)}>Level assist</Checkbox>
               <Checkbox size="sm" isChecked={imageryOn} onChange={(e) => setImageryOn(e.target.checked)}>Satellite imagery</Checkbox>
               <Checkbox size="sm" isChecked={buildingsOn} onChange={(e) => setBuildingsOn(e.target.checked)}>Buildings</Checkbox>
+              <Checkbox size="sm" isChecked={labelsOn} isDisabled={!imageryOn} onChange={(e) => setLabelsOn(e.target.checked)}>Street names</Checkbox>
             </Flex>
             <Flex gap={1} mt={2} align="center"><Text>Time</Text><Button size="xs" onClick={() => actions.current?.timeShift(-1)} aria-label="One hour earlier">−1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift(1)} aria-label="One hour later">+1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift('now')}>Now</Button></Flex>
           </Box>}
