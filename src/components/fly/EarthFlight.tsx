@@ -16,7 +16,7 @@ import { PLACES, placeById } from '@/lib/fly/earth/places';
 import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import { computeWarnings } from '@/lib/fly/warnings';
-import { ONBOARDING_DONE, ONBOARDING_STEPS, nextOnboardingStep } from '@/lib/fly/onboarding';
+import { ONBOARDING_DONE, ONBOARDING_STEPS, ONBOARDING_STEPS_TOUCH, nextOnboardingStep } from '@/lib/fly/onboarding';
 import { FlightAudio } from '@/lib/fly/audio';
 import { type FlightLogEntry, appendLogEntry, loadLog, nearestPlace } from '@/lib/fly/log';
 import { type Badge, computeBadges, loadAchievements, recordLanding, recordTick } from '@/lib/fly/achievements';
@@ -374,6 +374,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             audio.touchdown(pendingEvent.speed, ship.landing.maxVz);
             const severity = Math.min(1, pendingEvent.speed / ship.landing.maxVz);
             padHub.rumble({ strong: severity, weak: severity * 0.6, ms: 180 + 220 * severity });
+            navigator.vibrate?.(Math.round(100 + 150 * severity)); // the same real impact severity, for touch devices without a gamepad
             state.event = null;
           }
           model.root.position.copy(shipLocal); model.root.quaternion.copy(qLocal);
@@ -501,9 +502,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     if (!hud || onboardingStep === ONBOARDING_DONE) return;
     const now = performance.now();
     if (onboardingStep === 4 && finalStepShownAtRef.current === null) finalStepShownAtRef.current = now;
-    const next = nextOnboardingStep(onboardingStep, { agl: hud.agl, event: hud.event }, viewSwitchedRef.current, finalStepShownAtRef.current, now);
+    const next = nextOnboardingStep(onboardingStep, { agl: hud.agl, event: hud.event }, viewSwitchedRef.current, finalStepShownAtRef.current, now, !isTouch);
     if (next !== onboardingStep) { setOnboardingStep(next); if (next === ONBOARDING_DONE) updateSettings({ firstFlightDone: true }); }
-  }, [hud, onboardingStep]);
+  }, [hud, onboardingStep, isTouch]);
 
   return (
     <Box position="fixed" inset={0} bg="#0a0d14" data-testid="earth" sx={isTouch ? { '& *': { backdropFilter: 'none !important' } } : undefined}>
@@ -586,7 +587,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
           {onboardingStep !== ONBOARDING_DONE && (
             <Flex position="absolute" top={isTouch ? '90px' : '70px'} left="50%" transform="translateX(-50%)" {...glass} px={4} py={2} align="center" gap={3} maxW="min(92vw, 420px)" zIndex={5} data-testid="earth-onboarding">
-              <Text fontSize="sm">{ONBOARDING_STEPS[onboardingStep]}</Text>
+              <Text fontSize="sm">{(isTouch ? ONBOARDING_STEPS_TOUCH : ONBOARDING_STEPS)[onboardingStep]}</Text>
               <Button size="xs" variant="ghost" onClick={skipOnboarding}>Skip</Button>
             </Flex>
           )}

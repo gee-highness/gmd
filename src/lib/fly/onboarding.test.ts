@@ -20,6 +20,9 @@ describe('nextOnboardingStep', () => {
 		expect(nextOnboardingStep(2, hud(100), false, null, 0)).toBe(2);
 		expect(nextOnboardingStep(2, hud(100), true, null, 0)).toBe(3);
 	});
+	it('step 2 passes through immediately when there is no touch control to switch view with', () => {
+		expect(nextOnboardingStep(2, hud(100), false, null, 0, false)).toBe(3);
+	});
 	it('step 3 → 4 only once a landing event shows', () => {
 		expect(nextOnboardingStep(3, hud(0, ''), true, null, 0)).toBe(3);
 		expect(nextOnboardingStep(3, hud(0, 'Landed.'), true, null, 0)).toBe(4);
