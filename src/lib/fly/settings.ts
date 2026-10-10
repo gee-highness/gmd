@@ -15,6 +15,8 @@ export interface FlySettings {
 	minimapOn: boolean;
 	hoverAssist: boolean;
 	levelAssist: boolean;
+	audioMuted: boolean;
+	audioVolume: number; // 0..1
 }
 
 export const DEFAULT_SETTINGS: FlySettings = {
@@ -27,6 +29,8 @@ export const DEFAULT_SETTINGS: FlySettings = {
 	minimapOn: false,
 	hoverAssist: true,
 	levelAssist: true,
+	audioMuted: false,
+	audioVolume: 0.6,
 };
 
 const STORAGE_KEY = 'fly.settings.v1';

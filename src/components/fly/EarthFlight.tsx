@@ -3,10 +3,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Box, Button, Checkbox, Flex, HStack, Input, Select, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Button, Checkbox, Flex, HStack, Input, Select, Slider, SliderFilledTrack, SliderThumb, SliderTrack, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FiArrowLeft, FiPause } from 'react-icons/fi';
 import { usePadFrames } from '@/components/input/usePad';
 import { buttonName } from '@/lib/input/gamepad';
+import { padHub } from '@/lib/input/hub';
 import { CameraRig, type ViewMode } from '@/lib/fly/camera';
 import { podTargets } from '@/lib/fly/ship/pods';
 import { KESTREL, KESTREL_FAST } from '@/lib/fly/ships/specs';
@@ -15,6 +16,7 @@ import { PLACES, placeById } from '@/lib/fly/earth/places';
 import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import { computeWarnings } from '@/lib/fly/warnings';
+import { FlightAudio } from '@/lib/fly/audio';
 import { type FlightLogEntry, appendLogEntry, loadLog, nearestPlace } from '@/lib/fly/log';
 import { type Badge, computeBadges, loadAchievements, recordLanding, recordTick } from '@/lib/fly/achievements';
 import TouchControls from './TouchControls';
@@ -48,6 +50,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [minimapOn, setMinimapOn] = useState(settings.minimapOn);
   const [reducedMotionPref, setReducedMotionPref] = useState(settings.reducedMotion);
   const [reality, setReality] = useState(settings.reality);
+  const [audioMuted, setAudioMuted] = useState(settings.audioMuted);
+  const [audioVolume, setAudioVolume] = useState(settings.audioVolume);
   const [logbookOpen, setLogbookOpen] = useState(false);
   const [logEntries, setLogEntries] = useState<FlightLogEntry[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -61,8 +65,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const firstPersist = useRef(true);
   useEffect(() => {
     if (firstPersist.current) { firstPersist.current = false; return; }
-    updateSettings({ hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotion: reducedMotionPref, reality });
-  }, [hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotionPref, reality]);
+    updateSettings({ hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotion: reducedMotionPref, reality, audioMuted, audioVolume });
+  }, [hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotionPref, reality, audioMuted, audioVolume]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
@@ -104,8 +108,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
   }, []);
   const crashed = crashInfo !== null;
-  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref, crashed });
-  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref, crashed };
+  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref, crashed, audioMuted, audioVolume });
+  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref, crashed, audioMuted, audioVolume };
   const keys = useRef(new Set<string>());
   const pad = useRef<FlightInput>({ ...NO_INPUT });
   const touchInput = useRef<FlightInput>({ ...NO_INPUT });
@@ -209,6 +213,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         scene.add(buildings.root);
 
         const dust = new Dust(); scene.add(dust.points);
+        const audio = new FlightAudio();
+        const resumeAudio = () => audio.resume();
+        window.addEventListener('pointerdown', resumeAudio); window.addEventListener('keydown', resumeAudio);
         const model = buildKestrel({ glass: lowQ ? 'simple' : 'physical', detail: lowQ ? 24 : 56, cheap: lowQ });
         model.root.traverse((o) => { if ((o as import('three').Mesh).isMesh) (o as import('three').Mesh).castShadow = true; });
         scene.add(model.root);
@@ -357,6 +364,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               // old silent instant respawn - the physics step is gated on f.crashed above, so the ship holds still.
               setCrashInfo({ speed: pendingEvent.speed, maxVz: ship.landing.maxVz });
             } else { eventText = EVENT_TEXT[pendingEvent.kind]; eventUntil = t + 4500; }
+            audio.touchdown(pendingEvent.speed, ship.landing.maxVz);
+            const severity = Math.min(1, pendingEvent.speed / ship.landing.maxVz);
+            padHub.rumble({ strong: severity, weak: severity * 0.6, ms: 180 + 220 * severity });
             state.event = null;
           }
           model.root.position.copy(shipLocal); model.root.quaternion.copy(qLocal);
@@ -420,6 +430,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             const bs = buildings.stats;
             if (!spawnInfo.pending) {
               recordTick(tel.mach, tel.altitudeAgl, tel.orbit.inOrbit);
+              audio.update({ thrustFraction: Math.max(tel.hover, tel.main), speedMs: tel.speed, muted: f.audioMuted, master: f.audioVolume });
               const last2 = trailBuf[trailBuf.length - 1];
               if (!last2 || Math.hypot(tel.lat - last2[0], tel.lon - last2[1]) > 1e-5) { // skip near-duplicate points (parked on the ground)
                 trailBuf.push([tel.lat, tel.lon]);
@@ -442,8 +453,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         (window as unknown as { __earth?: unknown }).__earth = { state, manager, buildings, model, teleport, get lit() { return lit; } };
         cleanup = () => {
           cancelAnimationFrame(raf); ro.disconnect(); window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur);
+          window.removeEventListener('pointerdown', resumeAudio); window.removeEventListener('keydown', resumeAudio);
           actions.current = null; delete (window as unknown as { __earth?: unknown }).__earth;
-          model.dispose(); dust.dispose(); buildings.dispose(); manager.dispose(); sky.dispose(); renderer.dispose(); canvas.remove();
+          model.dispose(); dust.dispose(); buildings.dispose(); manager.dispose(); sky.dispose(); renderer.dispose(); canvas.remove(); audio.dispose();
         };
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Earth could not start on this device.');
@@ -671,6 +683,16 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
                   <option value="strict">Strict — assists off</option>
                 </Select>
                 <Text fontSize="xs" color="content.muted" mt={1}>Sets Hover assist and Level assist; you can still toggle either one in Controls afterward.</Text>
+              </Box>
+              <Box>
+                <HStack justify="space-between" mb={1}>
+                  <Text fontSize="sm" color="content.secondary">Audio</Text>
+                  <Checkbox size="sm" isChecked={audioMuted} onChange={(e) => setAudioMuted(e.target.checked)}>Mute</Checkbox>
+                </HStack>
+                <Slider aria-label="Audio volume" value={audioVolume} min={0} max={1} step={0.05} onChange={setAudioVolume} isDisabled={audioMuted}>
+                  <SliderTrack><SliderFilledTrack /></SliderTrack>
+                  <SliderThumb />
+                </Slider>
               </Box>
               <Button variant="outline" onClick={openLogbook}>Logbook</Button>
               <Button variant="outline" onClick={onBack}>Exit to hangar</Button>
