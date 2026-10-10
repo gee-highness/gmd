@@ -16,6 +16,7 @@ import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import TouchControls from './TouchControls';
 import { useTouchDevice } from './useLandscape';
+import PlaceSearch from './PlaceSearch';
 
 const Minimap = dynamic(() => import('./Minimap'), { ssr: false });
 
@@ -471,6 +472,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               </Select>
               {!isTouch && <Input size="xs" w="150px" placeholder="lat, lon" value={coords} onChange={(e) => setCoords(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') goCoords(); }} aria-label="Go to latitude, longitude" aria-invalid={!!coordError} data-testid="earth-coords" />}
               {!isTouch && <Button size="xs" onClick={goCoords}>Go</Button>}
+              {!isTouch && <PlaceSearch glass={glass} onSelect={(la, lo) => actions.current?.teleport(la, lo, 0)} />}
             </Flex>
           </HStack>
             {coordError && <Text fontSize="xs" color="red.300" role="alert">{coordError}</Text>}
