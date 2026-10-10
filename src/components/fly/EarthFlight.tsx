@@ -32,6 +32,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [levelAssist, setLevelAssist] = useState(true);
   const [buildingsOn, setBuildingsOn] = useState(true);
   const [imageryOn, setImageryOn] = useState(true);
+  const [labelsOn, setLabelsOn] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
@@ -72,8 +73,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
     return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
   }, []);
-  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn });
-  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn };
+  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn });
+  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn };
   const keys = useRef(new Set<string>());
   const pad = useRef<FlightInput>({ ...NO_INPUT });
   const touchInput = useRef<FlightInput>({ ...NO_INPUT });
@@ -159,7 +160,11 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         scene.add(sky.mesh);
 
         const providers = imagery.DEFAULT_PROVIDERS;
-        const networkLoadImage = loaders.makeImageLoader(providers);
+        // Street/place names are a label overlay composited onto the satellite tile, live-toggled without rebuilding
+        // the loader; like the OSM_STREETS layer in mapLayers.ts, it needs a network, so it wraps the network loader,
+        // never the offline pack (the pack's bundled imagery has no matching label data).
+        const labelsOnRef = { current: false }; // synced from flags.current every frame, below, like imageryEnabled/buildings.enabled
+        const networkLoadImage = loaders.makeLabeledImageLoader(loaders.makeImageLoader(providers), imagery.OSM_LABELS, () => labelsOnRef.current);
         // The offline world pack (docs/plan-offline-world.md) sits behind the network sources: real
         // elevation/imagery wins when reachable, the pack answers instantly with no network at all
         // and silently stands in whenever the network loader fails (offline, blocked, or just slow).
@@ -265,7 +270,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             else if (emaDt < 0.021 && pr < prMax && t - lastDown > 20000 && t - calmSince > 8000) { pr = Math.min(prMax, pr * 1.1); renderer.setPixelRatio(pr); fit(); calmSince = t; }
             else if (emaDt >= 0.021) calmSince = t;
           }
-          manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn;
+          manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn; labelsOnRef.current = f.labelsOn;
 
           const kin = keyboardInput(), pin = pad.current;
           const tin = touchInput.current;
@@ -462,6 +467,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               <Checkbox size="sm" isChecked={levelAssist} onChange={(e) => setLevelAssist(e.target.checked)}>Level assist</Checkbox>
               <Checkbox size="sm" isChecked={imageryOn} onChange={(e) => setImageryOn(e.target.checked)}>Satellite imagery</Checkbox>
               <Checkbox size="sm" isChecked={buildingsOn} onChange={(e) => setBuildingsOn(e.target.checked)}>Buildings</Checkbox>
+              <Checkbox size="sm" isChecked={labelsOn} isDisabled={!imageryOn} onChange={(e) => setLabelsOn(e.target.checked)}>Street names</Checkbox>
             </Flex>
             <Flex gap={1} mt={2} align="center"><Text>Time</Text><Button size="xs" onClick={() => actions.current?.timeShift(-1)} aria-label="One hour earlier">−1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift(1)} aria-label="One hour later">+1 h</Button><Button size="xs" onClick={() => actions.current?.timeShift('now')}>Now</Button></Flex>
           </Box>}

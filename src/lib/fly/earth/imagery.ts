@@ -32,6 +32,18 @@ export const GIBS_BLUE_MARBLE: ImageryProvider = {
 
 export const DEFAULT_PROVIDERS = [EOX_S2, GIBS_BLUE_MARBLE];
 
+/**
+ * Place and street names only (transparent background, no basemap underneath): a label *overlay* composited onto the
+ * satellite imagery by `makeLabeledImageLoader`, not a base provider in `DEFAULT_PROVIDERS`. CARTO's "Voyager" style
+ * family built from OpenStreetMap data, CC BY 4.0/ODbL. maxZoom 20 covers every terrain zoom (≤ 13), so the label
+ * tile always lines up exactly with the base tile's (z, x, y) - no separate UV mapping needed.
+ */
+export const OSM_LABELS: ImageryProvider = {
+	id: 'carto-voyager-labels', name: 'Place & street names', maxZoom: 20,
+	url: (t) => `https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/${t.z}/${t.x}/${t.y}.png`,
+	attribution: 'Place and street names © OpenStreetMap contributors, style © CARTO',
+};
+
 /** Which imagery tile covers a geometry tile at a provider's maximum zoom, and the UV window of it. */
 export function imageryFor(id: TileId, maxZoom: number): { tile: TileId; repeat: number; offsetX: number; offsetY: number } {
 	if (id.z <= maxZoom) return { tile: id, repeat: 1, offsetX: 0, offsetY: 0 };
