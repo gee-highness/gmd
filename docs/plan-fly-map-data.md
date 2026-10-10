@@ -17,9 +17,9 @@ value for effort, not by dependency - do them in any order, or skip any of them.
 | Street labels (3D ground only) | `lib/fly/earth/imagery.ts` (`OSM_LABELS`), `loaders.ts` (`makeLabeledImageLoader`) | Composites CARTO label tiles onto the satellite texture |
 | Start points | `lib/fly/earth/places.ts` | 18 hard-coded `{id, name, lat, lon, heading, blurb}`, used by the `<Select>` in `EarthFlight.tsx` |
 
-None of this fetches any point data (airports, POIs, weather) yet - only base-map imagery. That's
-what phases 1-4 below add. All are **overlay layers on the existing minimap**, not changes to the
-3D terrain.
+None of this fetches any point data (airports, POIs) yet - only base-map imagery. That's what
+phases 1-3 below add. All are **overlay layers on the existing minimap**, not changes to the 3D
+terrain.
 
 ## 1. Phase 1: airports/airfields as clickable teleport points (do first)
 
@@ -80,34 +80,7 @@ needed; manual check is enough given it is a thin UI layer on a tested teleport 
 **Effort:** small. **Risk:** low; graceful failure (no results) is just an empty dropdown, same
 posture as the current `coordError` state already handles for malformed lat/lon.
 
-## 3. Phase 3: terrain/weather base layers
-
-Two more entries in `MAP_LAYERS` (`mapLayers.ts`), no new plumbing - the minimap's layer `<Select>`
-already iterates `MAP_LAYERS` generically.
-
-1. **OpenTopoMap** (contour/terrain style, OSM-derived, CC BY-SA, `maxNativeZoom` 17, free, no
-   key): useful on a flight sim minimap to see terrain shape, not just satellite colour.
-2. **Weather overlay** (OpenWeatherMap tile layers - clouds/precipitation/wind, free tier needs an
-   API key): this is the one piece here that is NOT "just add a `MapLayerDef`", because it needs a
-   secret. Two sub-options:
-   - **Skip it** (recommended default) - the app has no server-side secret-handling precedent for
-     a client-visible map tile key (Sanity's write token is explicitly server-only,
-     `lib/sanity.server.ts`), and an OpenWeatherMap key embedded in client JS is usable by anyone
-     who looks, so it would need a thin proxy route (`src/app/api/weather-tile/route.ts`, forwarding
-     the request server-side, key in env) to do properly - real but second-order effort.
-   - **Build it properly**: proxy route as above, `NEXT_PUBLIC`-free key in `.env.local` (matches
-     `SANITY_API_WRITE_TOKEN`'s existing pattern), `onlineOnly: true` (weather has no offline
-     meaning anyway).
-
-**Verification:** OpenTopoMap is a one-line `MapLayerDef` addition, covered by the same
-`mapLayers.test.ts` pattern already testing `MAP_LAYERS`. Weather (if built) needs a route test for
-the proxy (mock the upstream fetch, assert the key never reaches the response/URL sent to the
-client) plus a manual check of the tile rendering.
-
-**Effort:** OpenTopoMap trivial; weather proxy small-medium (new secret, new route).
-**Risk:** OpenTopoMap none; weather needs the proxy done correctly or the key leaks.
-
-## 4. Phase 4: flight path trail and distance
+## 3. Phase 3: flight path trail and distance
 
 A different kind of data: generated from the flight itself, not fetched.
 
@@ -124,7 +97,7 @@ isolation (pure functions, no DOM/Leaflet needed - same testability bar as `geo.
 **Effort:** small. **Risk:** low (purely additive, no new data source, bounded memory by
 construction).
 
-## 5. Explicitly out of scope (for now)
+## 4. Explicitly out of scope (for now)
 
 - **Live traffic/other-aircraft data:** no free, no-key, no-rate-limit source exists; would need a
   paid feed. Not worth building until there's a real one to point at.
@@ -134,8 +107,7 @@ construction).
   backend), which is a different, bigger feature (persistence) wearing a map-data costume. Revisit
   only if persistence is wanted for its own sake.
 
-## 6. Suggested order
+## 5. Suggested order
 
-1 (airports/teleport) → 4 (flight trail, cheap, no new data source) → 2 (geocoding search) → 3
-(OpenTopoMap layer; weather only if the proxy work is wanted). Each phase stands alone, so this is
-a suggestion, not a dependency chain.
+1 (airports/teleport) → 3 (flight trail, cheap, no new data source) → 2 (geocoding search). Each
+phase stands alone, so this is a suggestion, not a dependency chain.
