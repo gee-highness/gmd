@@ -12,8 +12,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 INPUTS = os.environ.get('WORLD_INPUTS', os.path.join(HERE, '..', '..', '..', 'original-uploads')) + '/'
 OUT = os.path.join(HERE, 'out') + '/'   # manifest fragments, packs (not shipped)
 EXP = os.path.join(HERE, 'exp') + '/'   # large intermediate rasters (not shipped)
+IMG = os.path.join(HERE, 'images') + '/'  # preview renders, shipped (small PNGs)
 os.makedirs(OUT, exist_ok=True)
 os.makedirs(EXP, exist_ok=True)
+os.makedirs(IMG, exist_ok=True)
 
 # Plan §1, §4 step 1.
 TOPOGRAPHY = 'topography_21K.png'
