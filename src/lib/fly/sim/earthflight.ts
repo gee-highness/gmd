@@ -40,6 +40,10 @@ export interface EarthState {
 	throttle: number;
 	/** Horizon-hold: the pitch angle above the local horizon (rad) the nose is held at, or null when the pilot is steering. */
 	pitchHold: number | null;
+	/** What an accelerometer in the cockpit reads, in g: proper acceleration (total acceleration minus true gravity; the
+	 *  tiny Coriolis/centrifugal terms are left in rather than separated out, since they are ≤0.003 g at any speed this
+	 *  ship flies - negligible next to a real 1-5 g maneuver). 1 g at rest on the ground. */
+	gForce: number;
 }
 
 export interface TerrainQuery {
@@ -73,7 +77,7 @@ export function spawnOnGround(latDeg: number, lonDeg: number, headingDeg: number
 	const p = geodeticToEcef(lat, lon, groundHeight + FOOT_OFFSET.down);
 	const s: EarthState = {
 		pos: new THREE.Vector3(...p), vel: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(),
-		propellant: spec.mass.propellant, gear: true, landed: true, time: 0, event: null, hover: 0, main: 0, mainSigned: 0, flightMode: false, throttle: 0, pitchHold: null,
+		propellant: spec.mass.propellant, gear: true, landed: true, time: 0, event: null, hover: 0, main: 0, mainSigned: 0, flightMode: false, throttle: 0, pitchHold: null, gForce: 1,
 	};
 	setAttitude(s.q, lat, lon, rad(headingDeg), 0);
 	return s;
@@ -298,6 +302,13 @@ function substep(s: EarthState, input: import('./flight').FlightInput, dt: numbe
 	s.hover = hover; s.main = Math.abs(main); s.mainSigned = main;
 
 	contact(s, geo, ground, terrain, spec, dt, m, gLocal, hover);
+
+	// Felt g-force, from the RK4 step already taken (no extra accel() call): a1 is total acceleration at the step's
+	// start (gravity + Coriolis/centrifugal + thrust + aero), so subtracting true gravity there leaves what the pilot
+	// actually feels. On the ground the integrator has no modelled normal-force reaction (contact() is a post-hoc
+	// position/velocity correction, not a force), so it reads close to 0 there instead of the felt 1 g - landed is
+	// the one case worth a direct override rather than trusting the integrator's output.
+	s.gForce = s.landed ? 1 : Math.hypot(a1[0] - gv[0], a1[1] - gv[1], a1[2] - gv[2]) / G0;
 	s.time += dt;
 }
 
@@ -373,7 +384,7 @@ export function earthTelemetry(s: EarthState, terrain: TerrainQuery, spec: ShipS
 		heading: ((deg(Math.atan2(fwd.dot(E), fwd.dot(N))) % 360) + 360) % 360,
 		pitch: deg(Math.asin(Math.max(-1, Math.min(1, fwd.dot(n))))),
 		mach: speed / a.speedOfSound, q: dynamicPressure(g.h, speed),
-		gForce: 0, heatFlux: heatFlux(g.h, speed), fuelFraction: s.propellant / spec.mass.propellant, mass: totalMass(s, spec),
+		gForce: s.gForce, heatFlux: heatFlux(g.h, speed), fuelFraction: s.propellant / spec.mass.propellant, mass: totalMass(s, spec),
 		hover: s.hover / spec.thrust.hover, main: s.main / spec.thrust.main,
 		air: { temperature: a.temperature, pressure: a.pressure, density: a.density },
 		inSpace: g.h > EARTH.karman,

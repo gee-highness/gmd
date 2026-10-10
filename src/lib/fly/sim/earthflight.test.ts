@@ -128,6 +128,29 @@ describe('telemetry', () => {
 	});
 });
 
+describe('felt g-force (what the accelerometer reads, docs/plan-fly-game-ux.md §2)', () => {
+	const airborneState = (altitude: number, propellant: number): EarthState => {
+		const p = geodeticToEcef(rad(0), rad(0), altitude);
+		return { pos: new THREE.Vector3(...p), vel: new THREE.Vector3(), q: new THREE.Quaternion(), w: new THREE.Vector3(), propellant, gear: false, landed: false, time: 0, event: null, hover: 0, main: 0, mainSigned: 0, flightMode: false, throttle: 0, pitchHold: null, gForce: 1 };
+	};
+	it('reads 1 g standing still on the ground, before and after a step', () => {
+		const s = spawnOnGround(0, 0, 0, 0);
+		expect(s.gForce).toBe(1);
+		stepEarth(s, NO_INPUT, 0.1, { height: () => 0 });
+		expect(s.gForce).toBeCloseTo(1, 6);
+	});
+	it('reads close to 0 g in free fall: no thrust (no propellant), clear of the ground', () => {
+		const s = airborneState(2000, 0);
+		stepEarth(s, NO_INPUT, 0.05, { height: () => -1e5 });
+		expect(s.gForce).toBeLessThan(0.05);
+	});
+	it('reads measurably more than 1 g while hover assist commands a hard climb against gravity', () => {
+		const s = airborneState(2000, KESTREL.mass.propellant);
+		stepEarth(s, { ...NO_INPUT, collective: 1 }, 0.05, { height: () => -1e5 });
+		expect(s.gForce).toBeGreaterThan(1.1);
+	});
+});
+
 import { AERO, liftCoefficient } from './earthflight';
 import { podTargets } from '../ship/pods';
 
