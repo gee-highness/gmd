@@ -45,10 +45,18 @@ TIER_BUDGET_BYTES = {'lite': 60 * 1_000_000, 'standard': 100 * 1_000_000, 'hd': 
 
 
 def box_downsample2(a):
-    """Area-average 2x downsample (plan §4 step 7: 'area-average, never nearest-neighbour')."""
+    """Area-average 2x downsample (plan §4 step 7: 'area-average, never nearest-neighbour').
+    Accumulates into a quarter-size float32 buffer instead of promoting the
+    whole input to float32 first, to keep the peak allocation small at z6
+    (16384^2, up to 3 channels)."""
     h, w = a.shape[:2]
-    a = a[:h - h % 2, :w - w % 2].astype(np.float32)
-    return (a[0::2, 0::2] + a[1::2, 0::2] + a[0::2, 1::2] + a[1::2, 1::2]) / 4.0
+    a = a[:h - h % 2, :w - w % 2]
+    out = a[0::2, 0::2].astype(np.float32)
+    out += a[1::2, 0::2]
+    out += a[0::2, 1::2]
+    out += a[1::2, 1::2]
+    out *= 0.25
+    return out
 
 
 def pyramid(z6_array, min_z=0):
@@ -180,40 +188,49 @@ def main():
     roughness = roughness_map(height_z6)  # z5 only, per plan §5
     print(f'  roughness done, {round(time.time() - t0, 1)} s')
 
-    print('pyramiding + encoding + writing PMTiles ...')
+    print('pyramiding + encoding + writing + verifying PMTiles, one layer at a time (bounds peak memory) ...')
+    import gc
+    files = {}
+    ok = True
+
+    def pack_layer(name, levels, lossless, quality, tile_type=TileType.WEBP):
+        nonlocal ok
+        path = OUT + name
+        size = write_pmtiles(path, levels, lossless, quality, tile_type)
+        ok &= verify_pmtiles(path, levels, lossless)
+        files[name] = size
+        print(f'  {name} done, {round(time.time() - t0, 1)} s')
+
     terrain_levels = build_terrain(height_z6, coast_m_z6, water_z6)
-    terrain_size = write_pmtiles(OUT + 'world-terrain.pmtiles', terrain_levels, lossless=True, quality=100,
-                                  tile_type=TileType.WEBP)
+    del height_z6, water_z6, coast_m_z6  # not needed past this point; frees ~2GB before the next pyramid
+    gc.collect()
+    pack_layer('world-terrain.pmtiles', terrain_levels, lossless=True, quality=100)
+    del terrain_levels
+    gc.collect()
 
     albedo_levels = pyramid(albedo_z6)
-    albedo_size = write_pmtiles(OUT + 'world-albedo.pmtiles', albedo_levels, lossless=False, quality=80,
-                                 tile_type=TileType.WEBP)
+    del albedo_z6
+    gc.collect()
+    pack_layer('world-albedo.pmtiles', albedo_levels, lossless=False, quality=80)
+    del albedo_levels
+    gc.collect()
 
     night_levels = pyramid(night_z6)
-    night_size = write_pmtiles(OUT + 'world-night.pmtiles', night_levels, lossless=False, quality=70,
-                                tile_type=TileType.WEBP)
-    print(f'  packed, {round(time.time() - t0, 1)} s')
+    del night_z6
+    gc.collect()
+    pack_layer('world-night.pmtiles', night_levels, lossless=False, quality=70)
+    del night_levels
+    gc.collect()
 
     # Roughness (z0-z5, plan §5) ships as a lossless WebP PMTiles archive too.
     roughness_levels = pyramid(roughness, min_z=0)
     del roughness_levels[MAX_Z]  # roughness is z0-z5 only (plan §5), z6 was never generated for it
-    roughness_size = write_pmtiles(OUT + 'world-roughness.pmtiles', roughness_levels, lossless=True, quality=100,
-                                    tile_type=TileType.WEBP)
+    del roughness
+    gc.collect()
+    pack_layer('world-roughness.pmtiles', roughness_levels, lossless=True, quality=100)
+    del roughness_levels
+    gc.collect()
 
-    print('verifying ...')
-    ok = True
-    ok &= verify_pmtiles(OUT + 'world-terrain.pmtiles', terrain_levels, lossless=True)
-    ok &= verify_pmtiles(OUT + 'world-albedo.pmtiles', albedo_levels, lossless=False)
-    ok &= verify_pmtiles(OUT + 'world-night.pmtiles', night_levels, lossless=False)
-    ok &= verify_pmtiles(OUT + 'world-roughness.pmtiles', roughness_levels, lossless=True)
-    print(f'  verified, {round(time.time() - t0, 1)} s')
-
-    files = {
-        'world-terrain.pmtiles': terrain_size,
-        'world-albedo.pmtiles': albedo_size,
-        'world-night.pmtiles': night_size,
-        'world-roughness.pmtiles': roughness_size,
-    }
     lite_bytes = sum(files.values())
 
     print()
