@@ -2,6 +2,8 @@
 
 Status: proposed. Nothing in this plan is implemented yet.
 
+> **Update 2026-10-10:** Phase B2 (tile pack) and B3 (service worker) are superseded by [`plan-offline-world.md`](plan-offline-world.md), which targets a 100–200 MB stylized pack instead of 0.5–2 GB, and Phase A (10× speed) is replaced by the realistic flight-feel work in §12 there. B1 and Phase C remain as written.
+
 ## 0. What I found
 
 **Network dependencies (everything else, including the galaxy, solar system, house viewer, HDRIs, textures and `land.json`, is already local):**
