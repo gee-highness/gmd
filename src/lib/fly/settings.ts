@@ -17,6 +17,7 @@ export interface FlySettings {
 	levelAssist: boolean;
 	audioMuted: boolean;
 	audioVolume: number; // 0..1
+	firstFlightDone: boolean;
 }
 
 export const DEFAULT_SETTINGS: FlySettings = {
@@ -31,6 +32,7 @@ export const DEFAULT_SETTINGS: FlySettings = {
 	levelAssist: true,
 	audioMuted: false,
 	audioVolume: 0.6,
+	firstFlightDone: false,
 };
 
 const STORAGE_KEY = 'fly.settings.v1';

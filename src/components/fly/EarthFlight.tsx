@@ -16,6 +16,7 @@ import { PLACES, placeById } from '@/lib/fly/earth/places';
 import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import { computeWarnings } from '@/lib/fly/warnings';
+import { ONBOARDING_DONE, ONBOARDING_STEPS, nextOnboardingStep } from '@/lib/fly/onboarding';
 import { FlightAudio } from '@/lib/fly/audio';
 import { type FlightLogEntry, appendLogEntry, loadLog, nearestPlace } from '@/lib/fly/log';
 import { type Badge, computeBadges, loadAchievements, recordLanding, recordTick } from '@/lib/fly/achievements';
@@ -54,6 +55,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [audioVolume, setAudioVolume] = useState(settings.audioVolume);
   const [photoMode, setPhotoMode] = useState(false);
   const [photoFov, setPhotoFov] = useState(0); // 0 = use the view's normal FOV
+  const [onboardingStep, setOnboardingStep] = useState(settings.firstFlightDone ? ONBOARDING_DONE : 0);
+  const viewSwitchedRef = useRef(false);
+  const finalStepShownAtRef = useRef<number | null>(null);
   const [logbookOpen, setLogbookOpen] = useState(false);
   const [logEntries, setLogEntries] = useState<FlightLogEntry[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
@@ -487,6 +491,19 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   // fuel forgiveness and recall-gating per the charter's full Strict description are not built yet.
   const setRealityPreset = (next: typeof reality) => { setReality(next); setHoverAssist(next !== 'strict'); setLevelAssist(next !== 'strict'); };
   const warnings = useMemo(() => (hud ? computeWarnings({ fuel: hud.fuel, gForce: hud.gForce, offline: hud.offline }) : []), [hud]);
+  const skipOnboarding = () => { setOnboardingStep(ONBOARDING_DONE); updateSettings({ firstFlightDone: true }); };
+  const isFirstViewRender = useRef(true);
+  useEffect(() => {
+    if (isFirstViewRender.current) { isFirstViewRender.current = false; return; }
+    viewSwitchedRef.current = true;
+  }, [view]);
+  useEffect(() => {
+    if (!hud || onboardingStep === ONBOARDING_DONE) return;
+    const now = performance.now();
+    if (onboardingStep === 4 && finalStepShownAtRef.current === null) finalStepShownAtRef.current = now;
+    const next = nextOnboardingStep(onboardingStep, { agl: hud.agl, event: hud.event }, viewSwitchedRef.current, finalStepShownAtRef.current, now);
+    if (next !== onboardingStep) { setOnboardingStep(next); if (next === ONBOARDING_DONE) updateSettings({ firstFlightDone: true }); }
+  }, [hud, onboardingStep]);
 
   return (
     <Box position="fixed" inset={0} bg="#0a0d14" data-testid="earth" sx={isTouch ? { '& *': { backdropFilter: 'none !important' } } : undefined}>
@@ -567,6 +584,12 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
 
           
 
+          {onboardingStep !== ONBOARDING_DONE && (
+            <Flex position="absolute" top={isTouch ? '90px' : '70px'} left="50%" transform="translateX(-50%)" {...glass} px={4} py={2} align="center" gap={3} maxW="min(92vw, 420px)" zIndex={5} data-testid="earth-onboarding">
+              <Text fontSize="sm">{ONBOARDING_STEPS[onboardingStep]}</Text>
+              <Button size="xs" variant="ghost" onClick={skipOnboarding}>Skip</Button>
+            </Flex>
+          )}
           <Flex position="absolute" left={3} right={3} bottom={isTouch ? 'auto' : 3} top={isTouch ? '54px' : 'auto'} direction="column" align="center" gap={2} pointerEvents="none" fontSize={isTouch ? 'xs' : undefined}>
             {hud && hud.msl > 20_000 && (
               <Flex {...glass} px={4} py={1} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="sm" data-testid="earth-orbit">
