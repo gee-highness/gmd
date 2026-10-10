@@ -3,8 +3,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Box, Button, Checkbox, Flex, HStack, Input, Select, Text, VisuallyHidden } from '@chakra-ui/react';
-import { FiArrowLeft } from 'react-icons/fi';
+import { Box, Button, Checkbox, Flex, HStack, Input, Select, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { FiArrowLeft, FiPause } from 'react-icons/fi';
 import { usePadFrames } from '@/components/input/usePad';
 import { buttonName } from '@/lib/input/gamepad';
 import { CameraRig, type ViewMode } from '@/lib/fly/camera';
@@ -13,6 +13,7 @@ import { KESTREL, KESTREL_FAST } from '@/lib/fly/ships/specs';
 import { NO_INPUT, type FlightInput } from '@/lib/fly/sim/flight';
 import { PLACES, placeById } from '@/lib/fly/earth/places';
 import { trailDistanceDeg } from '@/lib/fly/earth/geo';
+import { loadSettings, resolveReducedMotion, updateSettings } from '@/lib/fly/settings';
 import TouchControls from './TouchControls';
 import { useTouchDevice } from './useLandscape';
 
@@ -32,13 +33,26 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [view, setView] = useState<ViewMode>('third');
   const [hud, setHud] = useState<Hud | null>(null);
   const [hideUi, setHideUi] = useState(false);
-  const [hoverAssist, setHoverAssist] = useState(true);
-  const [levelAssist, setLevelAssist] = useState(true);
-  const [buildingsOn, setBuildingsOn] = useState(true);
-  const [imageryOn, setImageryOn] = useState(true);
-  const [labelsOn, setLabelsOn] = useState(false);
-  const [minimapOn, setMinimapOn] = useState(false);
+  // Initial values come from the last saved settings (docs/plan-fly-game-ux.md Phase 1); the lazy initializer runs
+  // once, before paint, so there's no flash of the hard-coded defaults before a saved preference "jumps in" later.
+  const [settings] = useState(loadSettings);
+  const [hoverAssist, setHoverAssist] = useState(settings.hoverAssist);
+  const [levelAssist, setLevelAssist] = useState(settings.levelAssist);
+  const [buildingsOn, setBuildingsOn] = useState(settings.buildingsOn);
+  const [imageryOn, setImageryOn] = useState(settings.imageryOn);
+  const [labelsOn, setLabelsOn] = useState(settings.labelsOn);
+  const [minimapOn, setMinimapOn] = useState(settings.minimapOn);
+  const [reducedMotionPref, setReducedMotionPref] = useState(settings.reducedMotion);
+  const [paused, setPaused] = useState(false);
   const [trail, setTrail] = useState<[number, number][]>([]);
+
+  // Persist every toggle on change, in one place, rather than an updateSettings() call scattered across six
+  // onChange handlers. Skips the very first render (nothing changed yet - it's exactly what was just loaded).
+  const firstPersist = useRef(true);
+  useEffect(() => {
+    if (firstPersist.current) { firstPersist.current = false; return; }
+    updateSettings({ hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotion: reducedMotionPref });
+  }, [hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, minimapOn, reducedMotionPref]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
@@ -79,8 +93,8 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     window.addEventListener('pointermove', wake); window.addEventListener('pointerdown', wake);
     return () => { window.clearTimeout(t); window.removeEventListener('pointermove', wake); window.removeEventListener('pointerdown', wake); };
   }, []);
-  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn });
-  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn };
+  const flags = useRef({ view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref });
+  flags.current = { view, hoverAssist, levelAssist, buildingsOn, imageryOn, labelsOn, paused, reducedMotionPref };
   const keys = useRef(new Set<string>());
   const pad = useRef<FlightInput>({ ...NO_INPUT });
   const touchInput = useRef<FlightInput>({ ...NO_INPUT });
@@ -239,6 +253,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           else if (k === ',' || k === '<') actions.current?.warp(-1);
           else if (k === 'h') setHoverAssist((v) => !v);
           else if (k === 'm') setMinimapOn((v) => !v);
+          else if (k === 'Escape') setPaused((v) => !v);
           else if (k === '[') actions.current?.timeShift(e.shiftKey ? -6 : -1);
           else if (k === ']') actions.current?.timeShift(e.shiftKey ? 6 : 1);
           else if (k === '{') actions.current?.timeShift(-6);
@@ -280,6 +295,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             else if (emaDt >= 0.021) calmSince = t;
           }
           manager.imageryEnabled = f.imageryOn; buildings.enabled = f.buildingsOn; labelsOnRef.current = f.labelsOn;
+          rig.reducedMotion = resolveReducedMotion(f.reducedMotionPref);
 
           const kin = keyboardInput(), pin = pad.current;
           const tin = touchInput.current;
@@ -302,7 +318,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             warpMax = allowed;
             if (warpNow > 1) timeOffsetMs += dt * 1000 * (warpNow - 1); // the day and night pass at the same pace
           }
-          if (!spawnInfo.pending) {
+          if (!spawnInfo.pending && !f.paused) {
             // Sub-steps proportional to the real frame time (never a fixed 1/60 s quantum): the ship then moves smoothly whatever the frame rate, instead of 1, 2 or 3 steps per frame.
             const n = Math.min(6, Math.max(1, Math.ceil(dt * 60 - 1e-6)));
             for (let i = 0; i < n; i++) sim.stepEarth(state, input, (dt / n) * warpNow, manager.terrain, { hoverAssist: f.hoverAssist, levelAssist: f.levelAssist, spec: ship });
@@ -439,6 +455,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           <Flex position="absolute" top={3} left={3} direction="column" align="start" gap={2} maxW="calc(100% - 64px)" pointerEvents="none">
             <HStack spacing={2} wrap="wrap" align="start" opacity={awake ? 1 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _focusWithin={{ opacity: 1, pointerEvents: 'auto' }} data-testid="earth-toolbar">
             <Button size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />} onClick={onBack}>Hangar</Button>
+            <Button size="sm" variant="glass" leftIcon={<FiPause aria-hidden="true" />} onClick={() => setPaused(true)} aria-label="Pause">{isTouch ? '' : 'Pause (Esc)'}</Button>
             {!isTouch && <Button size="xs" variant={packUpdate === 'available' ? 'solid' : 'glass'} colorScheme={packUpdate === 'available' ? 'green' : undefined} isLoading={packUpdate === 'checking'} onClick={() => (packUpdate === 'available' ? window.location.reload() : void checkForUpdates())} data-testid="pack-update-button">
               {packUpdate === 'available' ? 'Offline world updated – reload' : packUpdate === 'current' ? 'Offline world up to date' : 'Check for offline updates'}
             </Button>}
@@ -552,6 +569,26 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           </Flex>
           {minimapOn && hud && <Minimap lat={hud.lat} lon={hud.lon} heading={hud.heading} agl={hud.agl} glass={glass} trail={trail} onSelectPlace={(la, lo) => actions.current?.teleport(la, lo, 0)} />}
         </>
+      )}
+      {paused && ready && (
+        <Flex position="absolute" inset={0} align="center" justify="center" bg="blackAlpha.700" zIndex={20} data-testid="earth-pause">
+          <Box {...glass} p={6} w="min(92vw, 360px)" role="dialog" aria-modal="true" aria-label="Paused">
+            <Text fontWeight={700} fontSize="lg" mb={4}>Paused</Text>
+            <Stack spacing={4} mb={2}>
+              <Button onClick={() => setPaused(false)} autoFocus>Resume</Button>
+              <Box>
+                <Text fontSize="sm" color="content.secondary" mb={1}>Comfort</Text>
+                <Select size="sm" value={reducedMotionPref} onChange={(e) => setReducedMotionPref(e.target.value as typeof reducedMotionPref)} aria-label="Reduced motion">
+                  <option value="auto">Reduced motion: follow system setting</option>
+                  <option value="on">Reduced motion: on</option>
+                  <option value="off">Reduced motion: off</option>
+                </Select>
+              </Box>
+              <Button variant="outline" onClick={onBack}>Exit to hangar</Button>
+            </Stack>
+            <Text fontSize="xs" color="content.muted">Esc to resume · the ship holds its position while paused</Text>
+          </Box>
+        </Flex>
       )}
       {isTouch && ready && <TouchControls input={touchInput} actions={() => actions.current} />}
       <VisuallyHidden role="status" aria-live="polite">{hud?.event ?? ''}</VisuallyHidden>
