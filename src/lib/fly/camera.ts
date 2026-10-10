@@ -68,6 +68,7 @@ export class CameraRig {
 	private leanVel = new THREE.Vector3();
 	private prevVel = new THREE.Vector3();
 	private started = false;
+	private shakeT = 0;
 	fov = THIRD_PERSON_FOV;
 	/** 0…1 intensity of acceleration-driven head motion; 0 disables it. */
 	comfort: number;
@@ -88,8 +89,13 @@ export class CameraRig {
 		this.blend = this.reducedMotion ? 1 : 0; // reduced motion: cut instead of gliding
 	}
 
-	/** Advance by dt seconds given the ship's pose and velocity; the result is in `this.pose` and `this.fov`. */
-	update(dt: number, shipPos: THREE.Vector3, shipQuat: THREE.Quaternion, shipVel: THREE.Vector3) {
+	/**
+	 * Advance by dt seconds given the ship's pose and velocity; the result is in `this.pose` and `this.fov`.
+	 * `qPa` (dynamic pressure, Pa) and `gForce` (felt g, docs/fly/09 physicality charter rule 1 again) are optional -
+	 * omit them for no turbulence shake (both callers that don't have that telemetry handy, and every existing test,
+	 * keep working with a perfectly smooth camera, which is what they already expect).
+	 */
+	update(dt: number, shipPos: THREE.Vector3, shipQuat: THREE.Quaternion, shipVel: THREE.Vector3, qPa = 0, gForce = 1) {
 		const d = Math.min(0.1, Math.max(0, dt));
 		// Chase camera: critically damped spring toward the target (ω = 3.2 rad/s ⇒ ~0.4 s lag).
 		const target = chaseTarget(shipPos, shipQuat);
@@ -123,6 +129,22 @@ export class CameraRig {
 			this.fov += (goalFov - this.fov) * Math.min(1, d * 6);
 		} else {
 			this.pose.pos.copy(goal.pos); this.pose.quat.copy(goal.quat); this.fov = goalFov;
+		}
+
+		// Turbulence shake: a small positional jitter from real dynamic pressure and excess g (above a normal 1.2 g
+		// manoeuvring margin) - never a flat/constant wobble. Two incommensurate sine terms per axis stand in for
+		// noise without needing a noise library; applied last, after the blend, so it never fights the mode-switch
+		// or the lean spring above.
+		this.shakeT += d;
+		if (!this.reducedMotion && this.comfort > 0) {
+			const excessG = Math.max(0, gForce - 1.2);
+			const amp = this.comfort * (Math.min(0.03, qPa / 300000) + Math.min(0.02, excessG * 0.006));
+			if (amp > 1e-5) {
+				const n = (f: number, p: number) => Math.sin(this.shakeT * f + p) + 0.5 * Math.sin(this.shakeT * f * 2.7 + p * 1.3);
+				this.pose.pos.x += n(23, 0) * amp;
+				this.pose.pos.y += n(19, 1.7) * amp;
+				this.pose.pos.z += n(17, 3.1) * amp;
+			}
 		}
 	}
 }

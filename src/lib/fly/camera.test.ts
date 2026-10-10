@@ -119,3 +119,48 @@ describe('chase heading while climbing vertically', () => {
 		expect(fn.z).toBeLessThan(-0.99);
 	});
 });
+
+describe('turbulence shake (docs/plan-fly-game-ux.md §4)', () => {
+	// Settle the chase spring first so position changes below are the shake, not the spring still catching up.
+	const settled = (rig: CameraRig, pos: THREE.Vector3, q: THREE.Quaternion, vel: THREE.Vector3, qPa = 0, gForce = 1) => {
+		for (let i = 0; i < 300; i++) rig.update(1 / 60, pos, q, vel, qPa, gForce);
+	};
+
+	it('omitting qPa/gForce (every pre-existing call site) gives a perfectly smooth camera, unchanged from before', () => {
+		const rig = new CameraRig('third');
+		const pos = v(), q = new THREE.Quaternion(), vel = v();
+		settled(rig, pos, q, vel);
+		const p1 = rig.pose.pos.clone();
+		rig.update(1 / 60, pos, q, vel);
+		const p2 = rig.pose.pos.clone();
+		expect(p1.distanceTo(p2)).toBeLessThan(1e-9);
+	});
+	it('high dynamic pressure or g produces a real, moving (non-zero, non-constant) position offset', () => {
+		const rig = new CameraRig('third');
+		const pos = v(), q = new THREE.Quaternion(), vel = v();
+		settled(rig, pos, q, vel, 50000, 1);
+		const p1 = rig.pose.pos.clone();
+		rig.update(1 / 60, pos, q, vel, 50000, 1);
+		const p2 = rig.pose.pos.clone();
+		expect(p1.distanceTo(p2)).toBeGreaterThan(0); // moving, not a static offset
+		expect(p1.distanceTo(chaseTarget(pos, q))).toBeGreaterThan(1e-4); // actually displaced from the unshaken target
+	});
+	it('is zero under reduced motion even with high q/g', () => {
+		const rig = new CameraRig('third', { reducedMotion: true });
+		const pos = v(), q = new THREE.Quaternion(), vel = v();
+		settled(rig, pos, q, vel, 80000, 3);
+		const p1 = rig.pose.pos.clone();
+		rig.update(1 / 60, pos, q, vel, 80000, 3);
+		expect(p1.distanceTo(rig.pose.pos)).toBeLessThan(1e-9);
+	});
+	it('scales down with the comfort factor, and is zero at comfort 0', () => {
+		const low = new CameraRig('third', { comfort: 0.1 });
+		const pos = v(), q = new THREE.Quaternion(), vel = v();
+		settled(low, pos, q, vel, 80000, 3);
+		const lowAmp = low.pose.pos.distanceTo(chaseTarget(pos, q));
+		const off = new CameraRig('third', { comfort: 0 });
+		settled(off, pos, q, vel, 80000, 3);
+		expect(off.pose.pos.distanceTo(chaseTarget(pos, q))).toBeLessThan(1e-9);
+		expect(lowAmp).toBeGreaterThan(0);
+	});
+});
