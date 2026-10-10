@@ -83,6 +83,16 @@ export function bearing(lat1: number, lon1: number, lat2: number, lon2: number):
 	return (Math.atan2(y, x) + 2 * Math.PI) % (2 * Math.PI);
 }
 
+/** Sum of consecutive great-circle legs along a flown path (m): the flight-trail "distance flown" readout. Degrees in, like the HUD and `places.ts`. */
+export function trailDistanceDeg(points: readonly (readonly [number, number])[]): number {
+	let total = 0;
+	for (let i = 1; i < points.length; i++) {
+		const [lat1, lon1] = points[i - 1], [lat2, lon2] = points[i];
+		total += greatCircle(rad(lat1), rad(lon1), rad(lat2), rad(lon2));
+	}
+	return total;
+}
+
 // ---------- gravity ----------
 
 /** Gravitational acceleration (no centrifugal term) at ECEF position: point mass plus J2 oblateness. */

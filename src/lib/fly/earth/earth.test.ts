@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EARTH, WGS84, bearing, circularSpeed, ecefToGeodetic, effectiveGravity, geodeticToEcef, gravityEcef, greatCircle, lonLatToTile, rad, tileBounds, tileLat, upAt, enuBasis, childrenOf, parentOf, tileSpanEquator } from './geo';
+import { EARTH, WGS84, bearing, circularSpeed, ecefToGeodetic, effectiveGravity, geodeticToEcef, gravityEcef, greatCircle, lonLatToTile, rad, tileBounds, tileLat, trailDistanceDeg, upAt, enuBasis, childrenOf, parentOf, tileSpanEquator } from './geo';
 import { airAt, mach } from './atmosphere';
 
 describe('WGS84 geodesy', () => {
@@ -32,6 +32,14 @@ describe('WGS84 geodesy', () => {
 		const d = greatCircle(rad(51.5074), rad(-0.1278), rad(40.7128), rad(-74.006));
 		expect(d / 1000).toBeGreaterThan(5540); expect(d / 1000).toBeLessThan(5600);
 		expect(bearing(rad(51.5074), rad(-0.1278), rad(40.7128), rad(-74.006)) * (180 / Math.PI)).toBeGreaterThan(285);
+	});
+	it('trail distance (degrees in, like the HUD): sums consecutive legs, zero for 0-1 points, matches greatCircle for a single leg', () => {
+		expect(trailDistanceDeg([])).toBe(0);
+		expect(trailDistanceDeg([[51.5074, -0.1278]])).toBe(0);
+		const london: [number, number] = [51.5074, -0.1278], nyc: [number, number] = [40.7128, -74.006], zurich: [number, number] = [47.3769, 8.5417];
+		expect(trailDistanceDeg([london, nyc])).toBeCloseTo(greatCircle(rad(london[0]), rad(london[1]), rad(nyc[0]), rad(nyc[1])), 3);
+		const viaZurich = trailDistanceDeg([london, zurich, nyc]);
+		expect(viaZurich).toBeGreaterThan(trailDistanceDeg([london, nyc])); // a detour is never shorter than the direct leg
 	});
 });
 

@@ -1,7 +1,7 @@
 // src/components/fly/EarthFlight.tsx
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Box, Button, Checkbox, Flex, HStack, Input, Select, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FiArrowLeft } from 'react-icons/fi';
@@ -12,6 +12,7 @@ import { podTargets } from '@/lib/fly/ship/pods';
 import { KESTREL, KESTREL_FAST } from '@/lib/fly/ships/specs';
 import { NO_INPUT, type FlightInput } from '@/lib/fly/sim/flight';
 import { PLACES, placeById } from '@/lib/fly/earth/places';
+import { trailDistanceDeg } from '@/lib/fly/earth/geo';
 import TouchControls from './TouchControls';
 import { useTouchDevice } from './useLandscape';
 
@@ -37,6 +38,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   const [imageryOn, setImageryOn] = useState(true);
   const [labelsOn, setLabelsOn] = useState(false);
   const [minimapOn, setMinimapOn] = useState(false);
+  const [trail, setTrail] = useState<[number, number][]>([]);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [placeId, setPlaceId] = useState('zurich');
@@ -207,6 +209,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           Object.assign(state, sim.spawnOnGround(lat, lon, hdg, 0, ship));
           frame.setAnchor([state.pos.x, state.pos.y, state.pos.z]);
           rig.snap(); gearDown = true; gearPos = 1;
+          trailBuf.length = 0; setTrail([]); // a new takeoff starts a new trail, not a line across the globe from wherever the last one ended
         };
         actions.current = {
           respawn: () => teleport(spawnInfo.lat, spawnInfo.lon, spawnInfo.hdg, 0),
@@ -258,6 +261,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
         let lastTel: ReturnType<typeof sim.earthTelemetry> | null = null;
         let emaDt = 0.02, govAt = 0, calmSince = 0, lastDown = -1e9, gearPos = 1, gearDown = true;
         let lastView: ViewMode = 'third', eventText = '', eventUntil = 0, raf = 0, last = performance.now(), hudAt = 0;
+        const trailBuf: [number, number][] = []; // flight trail (docs/plan-fly-map-data.md §3): bounded ring buffer, synced to React state on each HUD tick
         const rd = (n: number, d = 0) => Number(n.toFixed(d));
 
         const loop = (t: number) => {
@@ -376,6 +380,14 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           if (t - hudAt > (lowQ ? 300 : 120)) {
             hudAt = t;
             const bs = buildings.stats;
+            if (!spawnInfo.pending) {
+              const last2 = trailBuf[trailBuf.length - 1];
+              if (!last2 || Math.hypot(tel.lat - last2[0], tel.lon - last2[1]) > 1e-5) { // skip near-duplicate points (parked on the ground)
+                trailBuf.push([tel.lat, tel.lon]);
+                if (trailBuf.length > 400) trailBuf.shift();
+                setTrail(trailBuf.slice());
+              }
+            }
             setHud({
               lat: rd(tel.lat, 4), lon: rd(tel.lon, 4), msl: tel.altitudeMsl, agl: tel.altitudeAgl, speed: tel.speed, vs: tel.verticalSpeed, heading: tel.heading, mach: tel.mach,
               fuel: tel.fuelFraction, mass: tel.mass, pressure: tel.air.pressure / 1000, temperature: tel.air.temperature - 273.15, q: tel.q / 1000, heat: tel.heatFlux / 1e4, sunElev,
@@ -413,6 +425,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
     setCoordError(''); actions.current?.teleport(lat, lon, 0);
   };
   const place = placeById(placeId);
+  const flownKm = useMemo(() => trailDistanceDeg(trail) / 1000, [trail]);
 
   return (
     <Box position="fixed" inset={0} bg="#0a0d14" data-testid="earth" sx={isTouch ? { '& *': { backdropFilter: 'none !important' } } : undefined}>
@@ -521,6 +534,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
               {hud?.flight && <Text>THR <b data-testid="hud-throttle">{fmt(hud.throttle * 100)}</b>%</Text>}
               {hud && (hud.msl > 15_000 || hud.flight) && <Text>PITCH <b data-testid="hud-pitch">{fmt(hud.pitch)}</b>°</Text>}
               <Text>FUEL <b>{fmt((hud?.fuel ?? 1) * 100)}</b>%</Text>
+              {flownKm > 0 && <Text>FLOWN <b>{fmt(flownKm, flownKm < 100 ? 1 : 0)}</b> km</Text>}
             </Flex>
 
             <Flex {...glass} px={4} py={1} gap={4} wrap="wrap" justify="center" fontFamily="mono" fontSize="xs" color="content.muted" data-testid="earth-air">
@@ -536,7 +550,7 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
             </Text>
             )}
           </Flex>
-          {minimapOn && hud && <Minimap lat={hud.lat} lon={hud.lon} heading={hud.heading} agl={hud.agl} glass={glass} />}
+          {minimapOn && hud && <Minimap lat={hud.lat} lon={hud.lon} heading={hud.heading} agl={hud.agl} glass={glass} trail={trail} onSelectPlace={(la, lo) => actions.current?.teleport(la, lo, 0)} />}
         </>
       )}
       {isTouch && ready && <TouchControls input={touchInput} actions={() => actions.current} />}
