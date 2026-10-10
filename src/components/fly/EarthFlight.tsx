@@ -38,6 +38,26 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
   useEffect(() => { const id = new URLSearchParams(window.location.search).get('place'); if (id && placeById(id)) setPlaceId(id); }, []);
   const [coords, setCoords] = useState('');
   const [coordError, setCoordError] = useState('');
+  // Offline world pack (docs/plan-offline-world.md §11): register the /fly-scoped service worker
+  // once on mount (independent of the WebGL scene below), and offer a manual "check for updates"
+  // that re-syncs packs/manifest.json whenever the device is online.
+  const [packUpdate, setPackUpdate] = useState<'idle' | 'checking' | 'available' | 'current'>('idle');
+  const swReg = useRef<ServiceWorkerRegistration | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { registerFlyServiceWorker } = await import('@/lib/fly/pack/offline');
+      const reg = await registerFlyServiceWorker();
+      if (!cancelled && reg) swReg.current = reg;
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const checkForUpdates = async () => {
+    setPackUpdate('checking');
+    const { checkForPackUpdate } = await import('@/lib/fly/pack/offline');
+    const { changed } = await checkForPackUpdate(swReg.current);
+    setPackUpdate(changed.length ? 'available' : 'current');
+  };
   // Game-style UI: the screen stays clear while you fly. Controls help follows the device in use (gone for a controller or touch),
   // the toolbar fades when the pointer is still, and the detailed telemetry is a toggle (T).
   const [inputKind, setInputKind] = useState<'keys' | 'pad'>('keys');
@@ -396,6 +416,9 @@ export default function EarthFlight({ onBack }: { onBack: () => void }) {
           <Flex position="absolute" top={3} left={3} direction="column" align="start" gap={2} maxW="calc(100% - 64px)" pointerEvents="none">
             <HStack spacing={2} wrap="wrap" align="start" opacity={awake ? 1 : 0} pointerEvents={awake ? 'auto' : 'none'} transition="opacity 0.4s" _focusWithin={{ opacity: 1, pointerEvents: 'auto' }} data-testid="earth-toolbar">
             <Button size="sm" variant="glass" leftIcon={<FiArrowLeft aria-hidden="true" />} onClick={onBack}>Hangar</Button>
+            {!isTouch && <Button size="xs" variant={packUpdate === 'available' ? 'solid' : 'glass'} colorScheme={packUpdate === 'available' ? 'green' : undefined} isLoading={packUpdate === 'checking'} onClick={() => (packUpdate === 'available' ? window.location.reload() : void checkForUpdates())} data-testid="pack-update-button">
+              {packUpdate === 'available' ? 'Offline world updated – reload' : packUpdate === 'current' ? 'Offline world up to date' : 'Check for offline updates'}
+            </Button>}
             {!isTouch && <Flex {...glass} px={1} py={1} gap={1} role="group" aria-label="Camera view">
               <Button size="xs" variant={view === 'first' ? 'solid' : 'ghost'} aria-pressed={view === 'first'} onClick={() => setView('first')}>First person</Button>
               <Button size="xs" variant={view === 'third' ? 'solid' : 'ghost'} aria-pressed={view === 'third'} onClick={() => setView('third')}>Third person</Button>
