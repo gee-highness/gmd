@@ -105,6 +105,22 @@ describe('chase camera at speed', () => {
 		const rest = chaseTarget(pos, q).distanceTo(pos);
 		expect(rig.pose.pos.distanceTo(pos)).toBeLessThan(rest * 1.15 + 1);
 	});
+	it('settles exactly on target at a very high, constant speed - no one-frame-travel lag bias', () => {
+		// A semi-implicit-Euler spring stepping error·ω² − 2ω·(chaseVel − shipVel) has a steady lag of
+		// shipSpeed·dt once chaseVel has matched shipVel (the velocity term alone can no longer close a position
+		// error that stopped growing); at the Kestrel's fast-performance top speed (~1000+ m/s) that is tens of
+		// metres, not the sub-metre settle the slow-speed test above allows. The closed-form spring has none.
+		const rig = new CameraRig('third');
+		const q = new THREE.Quaternion(), vel = new THREE.Vector3(1200, 0, 0), pos = new THREE.Vector3();
+		for (let i = 0; i < 600; i++) { pos.addScaledVector(vel, 1 / 60); rig.update(1 / 60, pos, q, vel); }
+		expect(rig.pose.pos.distanceTo(chaseTarget(pos, q))).toBeLessThan(0.01);
+	});
+	it('settles exactly on target regardless of frame time (no dt-dependent lag)', () => {
+		const rig = new CameraRig('third');
+		const q = new THREE.Quaternion(), vel = new THREE.Vector3(1200, 0, 0), pos = new THREE.Vector3();
+		for (let i = 0; i < 50; i++) { pos.addScaledVector(vel, 0.1); rig.update(0.1, pos, q, vel); } // a slow/stuttering 10 fps (the update's own dt clamp)
+		expect(rig.pose.pos.distanceTo(chaseTarget(pos, q))).toBeLessThan(0.01);
+	});
 });
 
 describe('chase heading while climbing vertically', () => {

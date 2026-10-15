@@ -101,9 +101,19 @@ export class CameraRig {
 		const target = chaseTarget(shipPos, shipQuat);
 		if (!this.started) { this.chasePos.copy(target); this.started = true; this.prevVel.copy(shipVel); }
 		const w = 3.2;
-		// Track the ship's velocity too (not only its position), so the camera does not trail further behind the faster the ship goes.
-		const acc = target.clone().sub(this.chasePos).multiplyScalar(w * w).addScaledVector(this.chaseVel.clone().sub(shipVel), -2 * w);
-		this.chaseVel.addScaledVector(acc, d); this.chasePos.addScaledVector(this.chaseVel, d);
+		// Exact critically-damped step for a target moving at ~shipVel over this frame (closed form, not symplectic
+		// Euler): stepping the spring with acceleration = error·ω² − 2ω·(chaseVel − shipVel) leaves a steady lag of
+		// shipSpeed·dt - one frame's travel, worse the faster the ship goes or the longer the frame, and only
+		// disguised as "the chase camera lagging behind" because it visibly grows and shrinks with frame time. This
+		// closed-form update has no such bias at any dt or speed.
+		const x0 = this.chasePos.clone().sub(target).addScaledVector(shipVel, d); // spring offset at the start of this step
+		const v0 = this.chaseVel.clone().sub(shipVel); // spring velocity (relative to the ship) at the start of this step
+		const wx0 = v0.clone().addScaledVector(x0, w); // v0 + ω·x0, shared by both closed-form terms below
+		const expTerm = Math.exp(-w * d);
+		const xd = x0.addScaledVector(wx0, d).multiplyScalar(expTerm);
+		const vd = v0.addScaledVector(wx0, -w * d).multiplyScalar(expTerm);
+		this.chasePos.copy(target).add(xd);
+		this.chaseVel.copy(shipVel).add(vd);
 		// Keep the chase camera above the ship's feet so it never dips under a landing pad.
 		this.chasePos.y = Math.max(this.chasePos.y, shipPos.y + 1.2);
 
