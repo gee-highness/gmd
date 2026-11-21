@@ -9,7 +9,11 @@ const d = (id: string, width = 1762, height = 879) => ({ src: `/projects/${id}.d
 const m = (id: string, width = 462, height = 767) => ({ src: `/projects/${id}.mobile.png`, width, height });
 
 export const projectMedia: Record<string, ProjectMedia> = {
-  'venda-khona': { mobile: m('venda-khona', 461, 766) },
+  'servo-pos': { desktop: d('servo-pos'), mobile: m('servo-pos') },
+  'venda-khona': { desktop: d('venda-khona'), mobile: m('venda-khona') },
+  'gss-lms': { desktop: d('gss-lms'), mobile: m('gss-lms') },
+  'v-me': { desktop: d('v-me'), mobile: m('v-me') },
+  'g-solutions': { desktop: d('g-solutions'), mobile: m('g-solutions') },
   agtfieldcore: { mobile: m('agtfieldcore') },
   'nexacore-solutions': { mobile: m('nexacore-solutions') },
   'ecot-system': { mobile: m('ecot-system') },

@@ -25,6 +25,113 @@ export type Project = {
 export const projectsData: Project[] = [
     // FEATURED PROJECTS
     {
+        id: 'servo-pos',
+        name: 'Servo POS',
+        shortDescription: 'Multi-tenant restaurant point of sale for Eswatini: till, kitchen screen, table QR ordering, stock and sales reports in the browser.',
+        longDescription: `Servo POS is a multi-tenant restaurant point of sale built for Eswatini, priced in Lilangeni (E). One Next.js 15 PWA serves every role, in front of a FastAPI + MongoDB API.
+
+Key Features:
+• POS till: fast order entry for tables and takeaway, cash recorded at the till
+• Kitchen screen: orders flow from new to preparing to ready in real time
+• Customer self-checkout: table QR ordering straight from the guest's phone
+• Management: menu, stock, staff and sales reports per restaurant
+• Card payments through DeltaCrypt, paid straight into each restaurant's own account
+• Platform admin: a separate support console for onboarding and managing restaurants
+• Live demo restaurant: try every screen without signing up`,
+        tech: ['Next.js 15', 'React', 'TypeScript', 'PWA', 'FastAPI', 'Python', 'MongoDB', 'Vercel'],
+        links: [
+            { label: 'Website', url: 'https://servo-pos.vercel.app/' },
+            { label: 'Live demo', url: 'https://servo-pos.vercel.app/#demo', note: 'No sign-up needed' }
+        ],
+        year: 2026,
+        role: 'Founder & Full-stack Developer',
+        screenshotAlt: 'Servo POS landing page with live order cards',
+        category: 'management',
+        featured: true,
+        metrics: {
+            apps: 'Till, kitchen, management, QR ordering, admin',
+            payments: 'DeltaCrypt cards + cash',
+            tenancy: 'Multi-restaurant'
+        }
+    },
+    {
+        id: 'venda-khona',
+        name: 'Venda Khona',
+        shortDescription: 'Complete marketplace platform for Eswatini with buyer/seller tools and offline mode.',
+        longDescription: `Venda Khona is a comprehensive digital marketplace designed specifically for Eswatini and Southern Africa. The platform addresses regional challenges including intermittent connectivity with an offline-first architecture, location-based services, and dual interfaces for buyers and sellers.
+
+Key Features:
+• Offline Browsing: Cache-first design works without internet
+• Location Intelligence: Smart filtering by region, city, and interactive maps
+• Shop Customization: Brandable storefronts with blogs and promotions
+• Built-in Messaging: Secure chat between buyers and sellers
+• Service Booking: Time slot scheduling for service providers
+• Comparison Tools: Side-by-side product comparison with favorites system
+• Seller Dashboard: Complete order management, analytics, and inventory tracking
+
+The platform supports both product sales and service bookings with negotiable pricing, and integrates with local payment preferences.`,
+        tech: ['React 18', 'Vite', 'TypeScript', 'Express', 'MongoDB Atlas', 'Vercel Blob', 'PWA', 'Vercel'],
+        links: [
+            { label: 'Marketplace', url: 'https://vendakhona.vercel.app/' },
+            { label: 'Demo shops', url: 'https://vendakhona.vercel.app/app/#/demo', note: 'See how shops look' },
+        ],
+        year: 2026,
+        role: 'Full-stack Developer & Product Designer',
+        screenshotAlt: 'Venda Khona marketplace with shop listings',
+        category: 'ecommerce',
+        featured: true,
+        metrics: {
+            platforms: 'Buyer + Seller interfaces',
+            offline: 'Cache-first architecture',
+            features: 'Maps, chat, booking system'
+        }
+    },
+    {
+        id: 'gss-lms',
+        name: 'GSS-LMS',
+        shortDescription: 'Multi-school learning management platform: each school gets its own portal for applications, courses, grades, attendance and fees.',
+        longDescription: `GSS-LMS is a multi-tenant learning management system by G-Solutions². Every school on the platform has its own address and branding, and students find their school by name from the GSS-LMS front door.
+
+Key Features:
+• Online applications: prospective students apply from the school's public site
+• Student portal: courses, grades, attendance and fees in one place
+• Per-school branding: each institution runs on its own portal and domain
+• Live schools: Mananga Business School and Nova Global Academy run on the platform`,
+        tech: ['React', 'TypeScript', 'Multi-tenant', 'Vercel'],
+        links: [
+            { label: 'GSS-LMS', url: 'https://gss-lms.vercel.app/', note: 'Find your school' },
+            { label: 'Mananga Business School', url: 'https://mananga-lms.vercel.app/', note: 'School portal on GSS-LMS' }
+        ],
+        year: 2026,
+        role: 'Lead Developer',
+        screenshotAlt: 'Mananga Business School portal running on GSS-LMS',
+        category: 'education',
+        featured: true
+    },
+    {
+        id: 'v-me',
+        name: 'V-Me',
+        shortDescription: 'A free, offline life game with a talking character, an open-plan home and a whole town, plus a film studio and avatar creator.',
+        longDescription: `V-Me is a life game, a film studio and an avatar creator in one free app. Live in a big open-plan home and a town full of people, with a character who talks, looks after themselves and chases goals. Play it your way, then turn any moment into a video.
+
+Key Features:
+• Talking character with its own voice service
+• Whole town and people to talk to, sandbox play
+• Film studio: turn any moment into a video
+• Avatar creator
+• Controller, touch and keyboard; dark and light mode
+• Works offline on Android, Windows, Linux and macOS`,
+        tech: ['3D', 'Game development', 'Cross-platform', 'Voice', 'Vercel'],
+        links: [
+            { label: 'Download', url: 'https://getvme.vercel.app/', note: 'Android, Windows, Linux, macOS' }
+        ],
+        year: 2026,
+        role: 'Creator & Developer',
+        screenshotAlt: 'V-Me download page with an in-game home scene',
+        category: 'game',
+        featured: true
+    },
+    {
         id: 'cmis-ai-decision-support',
         name: 'CMIS AI Decision Support',
         shortDescription: 'AI system in CMIS that identifies interrupted-in-treatment patients, with a privacy-preserving AI assistant for Power BI dashboards.',
@@ -44,35 +151,25 @@ Key Features:
         featured: true
     },
     {
-        id: 'venda-khona',
-        name: 'Venda Khona',
-        shortDescription: 'Complete marketplace platform for Eswatini with buyer/seller tools and offline mode.',
-        longDescription: `Venda Khona is a comprehensive digital marketplace designed specifically for Eswatini and Southern Africa. The platform addresses regional challenges including intermittent connectivity with an offline-first architecture, location-based services, and dual interfaces for buyers and sellers.
+        id: 'g-solutions',
+        name: 'G-Solutions²',
+        shortDescription: 'Business management system with a customer-facing portal and an internal staff dashboard.',
+        longDescription: `G-Solutions² is a business management system for G-Solutions²: a customer-facing site for services, products, community and news, and an internal staff dashboard.
 
 Key Features:
-• Offline Browsing: Cache-first design works without internet
-• Location Intelligence: Smart filtering by region, city, and interactive maps
-• Shop Customization: Brandable storefronts with blogs and promotions
-• Built-in Messaging: Secure chat between buyers and sellers
-• Service Booking: Time slot scheduling for service providers
-• Comparison Tools: Side-by-side product comparison with favorites system
-• Seller Dashboard: Complete order management, analytics, and inventory tracking
-
-The platform supports both product sales and service bookings with negotiable pricing, and integrates with local payment preferences.`,
-        tech: ['Next.js', 'React', 'Node.js', 'MongoDB', 'Redis', 'Mapbox', 'Chakra UI', 'Vercel', 'Service Workers'],
+• Customer portal: services, products, shop, community and blog
+• Staff dashboard: financial tracking, operations, content and user management
+• Staff engagement: daily briefing with login bonuses and work streaks
+• Installable, mobile-first navigation`,
+        tech: ['React', 'TypeScript', 'Vite', 'Vercel'],
         links: [
-            { label: 'Marketplace', url: 'https://venda-khona.vercel.app' },
+            { label: 'Live website', url: 'https://gss-sz.vercel.app/' }
         ],
-        year: 2024,
-        role: 'Full-stack Developer & Product Designer',
-        screenshotAlt: 'Venda Khona marketplace with shop listings',
-        category: 'ecommerce',
-        featured: true,
-        metrics: {
-            platforms: 'Buyer + Seller interfaces',
-            offline: 'Cache-first architecture',
-            features: 'Maps, chat, booking system'
-        }
+        year: 2026,
+        role: 'Founder & Developer',
+        screenshotAlt: 'G-Solutions² customer site home page',
+        category: 'management',
+        featured: false
     },
     {
         id: 'agtfieldcore',
@@ -90,15 +187,12 @@ Key Features:
 
 The system includes modules for field logs, asset tracking, safety compliance, project management, and predictive analytics.`,
         tech: ['React PWA', 'TypeScript', 'TensorFlow.js', 'Sanity.io', 'Service Workers', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Live Application', url: 'https://agtfieldcore.vercel.app', note: 'Production v1.0' }
-        ],
         credentials: { username: 'field_operator', password: 'demo@agt123', note: 'Use "project_manager" for admin features' },
         year: 2024,
         role: 'Lead Developer & System Architect',
         screenshotAlt: 'AGT FieldCore field management dashboard',
         category: 'enterprise',
-        featured: true,
+        featured: false,
         metrics: {
             users: '50+ field operators',
             performance: '98% offline capability',
@@ -125,16 +219,12 @@ Key Features:
 • Interactive Network Feed: Live updates and connection requests
 • Regional Coverage: Business listings across SADC countries`,
         tech: ['Next.js PWA', 'TypeScript', 'React', 'MongoDB', 'Stripe', 'Mapbox', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'SADC Business Wire', url: 'https://nexa-solutions.africa/#/news', note: 'Regional business news' },
-            { label: 'Main Platform', url: 'https://nexa-solutions.africa', note: 'Complete ecosystem' }
-        ],
         credentials: { note: 'Use role switcher in demo to access: Customer, Staff, Admin portals' },
         year: 2024,
         role: 'Lead Full-stack Developer & Platform Architect',
         screenshotAlt: 'NexaCore business platform with services and network',
         category: 'marketplace',
-        featured: true,
+        featured: false,
         metrics: {
             components: '4 integrated portals',
             regions: 'SADC business network',
@@ -157,15 +247,12 @@ System Architecture:
 
 Demonstrates complex role-based UI, academic workflow automation, and multi-tenant architecture in a single cohesive application.`,
         tech: ['Next.js', 'TypeScript', 'PostgreSQL', 'Prisma', 'JWT', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Live Demo', url: 'https://ecot-demo.vercel.app', note: 'All portals in one - use role switcher' }
-        ],
         credentials: { note: 'Switch between: Student, Teacher, Admin roles in application' },
         year: 2024,
         role: 'Lead Full-Stack Developer & System Architect',
         screenshotAlt: 'ECOT university management system dashboard',
         category: 'education',
-        featured: true,
+        featured: false,
         metrics: {
             roles: '4 user portals in one',
             programs: '21+ technical diploma programs',
@@ -173,7 +260,7 @@ Demonstrates complex role-based UI, academic workflow automation, and multi-tena
         }
     },
 
-    // MANAGEMENT & PRODUCTIVITY
+    // MANAGEMENT & PRODUCTIVITY,
     {
         id: 'caterflow-synapse',
         name: 'Caterflow by Synapse',
@@ -213,9 +300,6 @@ Features:
 • AI-Powered Suggestions: Smart task assignment and deadline predictions
 • Integration Ready: Webhook support for connecting with other tools`,
         tech: ['React', 'TypeScript', 'Node.js', 'MongoDB', 'Socket.io', 'D3.js', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Live Application', url: 'https://triptych-tasks.vercel.app' }
-        ],
         credentials: { username: 'demo@triptych.com', password: 'taskmanager2024', note: 'Team lead role with sample projects' },
         year: 2024,
         role: 'Full-stack Developer',
@@ -241,10 +325,6 @@ Key Capabilities:
 
 The system supports multiple file types, includes built-in OCR for scanned documents, and offers comprehensive audit trails.`,
         tech: ['Next.js', 'TypeScript', 'PostgreSQL', 'Prisma', 'AWS S3', 'Tesseract.js', 'PDF.js', 'Chakra UI'],
-        links: [
-            { label: 'Live Demo', url: 'https://doctrack-pro.vercel.app' },
-            { label: 'TS Version', url: 'https://doctrack-ts.vercel.app', note: 'TypeScript rewrite' }
-        ],
         credentials: { username: 'admin@doctrack.demo', password: 'secureDoc2024!', note: 'Administrator with sample documents' },
         year: 2024,
         role: 'Full-stack Developer',
@@ -265,10 +345,6 @@ Deployments:
 
 Features secure separation of concerns with dedicated interfaces for different user types, financial data management, and investment tracking workflows.`,
         tech: ['Next.js', 'TypeScript', 'PostgreSQL', 'Prisma', 'Financial APIs', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Customer Portal', url: 'https://ndou-invest.vercel.app', note: 'Public investor platform' },
-            { label: 'Management Portal', url: 'https://ndou-management.vercel.app', note: 'Internal administration' }
-        ],
         credentials: { note: 'Separate deployments for customers vs management' },
         year: 2024,
         role: 'Full-stack Developer',
@@ -289,10 +365,6 @@ Deployments:
 
 Features role-specific interfaces, service management workflows, and operational analytics for business efficiency.`,
         tech: ['Next.js', 'TypeScript', 'PostgreSQL', 'Prisma', 'Service Management', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Customer Portal', url: 'https://dixies-sz.vercel.app', note: 'Client-facing interface' },
-            { label: 'Management Portal', url: 'https://dixies-mgmt.vercel.app', note: 'Internal administration' }
-        ],
         year: 2024,
         role: 'Full-stack Developer',
         repo: 'https://github.com/geehyness/dixies-sz',
@@ -301,7 +373,7 @@ Features role-specific interfaces, service management workflows, and operational
         featured: false
     },
 
-    // WEB APPS & UTILITIES
+    // WEB APPS & UTILITIES,
     {
         id: 'bible-reader',
         name: 'Bible Reader PWA',
@@ -319,9 +391,6 @@ Features:
 
 The app uses service workers for background syncing and IndexedDB for local storage of user data.`,
         tech: ['PWA', 'React', 'IndexedDB', 'Service Workers', 'Web Audio API', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Live App', url: 'https://bible-reader-omega.vercel.app' }
-        ],
         credentials: { note: 'No login required - all features available immediately' },
         year: 2024,
         role: 'Solo Developer & Designer',
@@ -347,8 +416,7 @@ Features:
 • Anti-cheat: Server-side validation to ensure fair play`,
         tech: ['React', 'Node.js', 'Socket.io', 'Redis', 'Canvas API', 'Chakra UI', 'Vercel'],
         links: [
-            { label: 'Play Now', url: 'https://ludo-kingdom.vercel.app' },
-            { label: 'Sync Service', url: 'https://ludo-sync.vercel.app', note: 'Game state synchronization' }
+            { label: 'Sync Service', url: 'https://gss-ludo-sync.vercel.app', note: 'Game state synchronization' }
         ],
         credentials: { note: 'Guest play or create account for ranked matches' },
         year: 2024,
@@ -359,7 +427,7 @@ Features:
         featured: false
     },
 
-    // YOUR EXISTING PROJECTS
+    // YOUR EXISTING PROJECTS,
     {
         id: 'chairapp',
         name: 'The Chair App',
@@ -384,9 +452,6 @@ Features:
         shortDescription: 'A modern restaurant POS built with Next.js and Sanity.',
         longDescription: 'Kimmy\'s is a full-featured point-of-sale system: real-time menu management and staff dashboards. Built with Next.js App Router, Sanity.io, and Chakra UI.',
         tech: ['Next.js', 'Sanity', 'TypeScript', 'Chakra UI', 'Postgres'],
-        links: [
-            { label: 'Customer site', url: 'https://kimmys.vercel.app/' },
-        ],
         credentials: null,
         year: 2024,
         role: 'Lead developer',
@@ -411,7 +476,7 @@ Features:
         featured: false
     },
 
-    // ADDITIONAL PROJECTS
+    // ADDITIONAL PROJECTS,
     {
         id: 'branding-design',
         name: 'Brand Design Management',
@@ -426,10 +491,6 @@ Features:
 • Export System: Automated asset exports in multiple formats and sizes
 • Integration: Connections with design tools (Figma, Adobe Creative Cloud)`,
         tech: ['Next.js', 'TypeScript', 'PostgreSQL', 'Cloudinary', 'Figma API', 'Chakra UI', 'Vercel'],
-        links: [
-            { label: 'Management Portal', url: 'https://branding-design-mgmt.vercel.app' },
-            { label: 'Client Portal', url: 'https://branding-design-ruby.vercel.app' }
-        ],
         year: 2024,
         role: 'Full-stack Developer & UI Designer',
         repo: 'https://github.com/geehyness/branding-design',
@@ -451,9 +512,6 @@ Features:
 • Blog/Content Management: Industry insights and updates
 • Performance Optimized: Fast loading, SEO-friendly structure`,
         tech: ['Next.js', 'TypeScript', 'Sanity.io', 'Framer Motion', 'Tailwind CSS', 'Vercel'],
-        links: [
-            { label: 'Live Website', url: 'https://synapse-digital.vercel.app' }
-        ],
         year: 2024,
         role: 'Frontend Developer & Designer',
         repo: 'https://github.com/geehyness/synapse-digital',
@@ -475,9 +533,6 @@ Features:
 • Documentation: Comprehensive customization guide
 • Responsive Design: Mobile-optimized across all pages`,
         tech: ['Next.js', 'TypeScript', 'Tailwind CSS', 'Component Library', 'Storybook', 'Vercel'],
-        links: [
-            { label: 'Demo', url: 'https://ecot-demo.vercel.app' }
-        ],
         year: 2024,
         role: 'Template Developer & Designer',
         repo: 'https://github.com/geehyness/school-template',
