@@ -172,6 +172,193 @@ Key Features:
         featured: false
     },
     {
+        id: 'shesha',
+        name: 'SHESHA',
+        shortDescription: "Open-world racing game set on Eswatini's MR3 corridor, built with Angular and three.js, playable offline and packaged for desktop and Android.",
+        longDescription: `SHESHA (siSwati for "go fast") is an open-world racing game set on Eswatini's MR3 road corridor, with the Hub of Eswatini as its starting point.
+
+Key Features:
+• Real places: a world prepared from OpenStreetMap and elevation data with a Blender pipeline
+• Real assets: CC0 textures and sky from Poly Haven, plus procedural road markings, signage, shop banners and vehicles
+• Looks: a clean full-resolution render, with an optional chunky retro look toggled in game
+• Controls: keyboard throttle, steer and handbrake, with camera, map and photo modes
+• Works offline: installable PWA with a service worker, plus Linux (AppImage, pacman) and Windows builds through Electron
+• Release automation: a GitHub workflow builds and attaches the downloads`,
+        tech: ['Angular 21', 'three.js', 'TypeScript', 'Electron', 'Capacitor', 'PWA', 'OpenStreetMap', 'Blender'],
+        links: [
+            { label: 'Source code', url: 'https://github.com/gee-highness/shesha' }
+        ],
+        year: 2026,
+        role: 'Game Developer',
+        repo: 'https://github.com/gee-highness/shesha',
+        screenshotAlt: 'SHESHA title screen over a 3D road scene in Eswatini',
+        category: 'game',
+        featured: false
+    },
+    {
+        id: 'jarvis-assistant',
+        name: 'J.A.R.V.I.S. Assistant',
+        shortDescription: 'Offline productivity assistant for Android with a fast, language-model-free "reflex brain", memory, voice and gamified habits.',
+        longDescription: `J.A.R.V.I.S. is an offline productivity assistant for Android. Its default "reflex brain" uses no language model at all, so replies arrive in milliseconds, work without internet and keep your data on the phone.
+
+Key Features:
+• Reflex brain: TF-IDF matching over 114 skills and hundreds of phrasings, with follow-ups and pronoun handling
+• Acts on your behalf: tasks, reminders, alarms, timers, focus sessions, habits, goals, journal, mood, notes and calendar
+• Memory: learns facts you tell it and recalls them later
+• Voice, home-screen widgets and a persona with adjustable personality sliders
+• Progress: XP, levels, streaks and daily quests
+• Optional on-device language model for open conversation
+• Tested headless with scripts, no Angular needed`,
+        tech: ['Angular 20', 'Capacitor', 'TypeScript', 'Android', 'Offline-first', 'NLP (TF-IDF)'],
+        links: [
+            { label: 'Download APK', url: 'https://github.com/gee-highness/jarvis-assistant/releases/latest', note: 'GitHub Releases' },
+            { label: 'Source code', url: 'https://github.com/gee-highness/jarvis-assistant' }
+        ],
+        year: 2026,
+        role: 'Creator & Developer',
+        repo: 'https://github.com/gee-highness/jarvis-assistant',
+        screenshotAlt: 'J.A.R.V.I.S. morning briefing screen on Android',
+        category: 'productivity',
+        featured: false
+    },
+    {
+        id: 'fleetflow',
+        name: 'FleetFlow Logistics',
+        shortDescription: 'Multi-tenant trucking logistics platform for Southern Africa: fleet dashboard, trips, driver tablet app and offline-first storage.',
+        longDescription: `FleetFlow is a multi-tenant logistics SaaS for the Eswatini and Southern African trucking market, built as an installable PWA that can also be wrapped as an Android app.
+
+Key Features:
+• Admin portal: live fleet map, trip scheduling, drivers, vehicles, geofences, reports and analytics
+• Driver tablet app: PIN login, digital pre-trip inspections, live trip tracking and electronic proof of delivery (ePOD)
+• Super admin panel: platform-wide monitoring, tenant management and system health
+• Multi-tenant: each logistics company's data is isolated
+• Offline-first: IndexedDB storage keeps the app working with poor connectivity
+• Maps with Leaflet and OpenStreetMap`,
+        tech: ['Angular 21', 'TypeScript', 'Tailwind CSS 4', 'IndexedDB', 'Leaflet', 'Capacitor', 'PWA'],
+        year: 2026,
+        role: 'Full-stack Developer',
+        screenshotAlt: 'FleetFlow admin dashboard with trips chart and fleet stats',
+        category: 'enterprise',
+        featured: false
+    },
+    {
+        id: 'eswatini-health-api',
+        name: 'Eswatini Health Indicators API',
+        shortDescription: 'Secured ASP.NET Core REST API with scheduled SQL Server ETL services that feed national health indicator dashboards.',
+        longDescription: `A .NET 9 REST API that gives dashboards a secure, consistent source for national health indicators, backed by scheduled ETL services that load programme data from source tables into a staging database.
+
+Key Features:
+• ETL services: three scheduled pipelines for HIV testing (HTS), PrEP and ART treatment outcomes, with batch IDs and de-duplication
+• Indicators API: indicators, regions, targets and dashboard endpoints
+• Security: JWT authentication, API-key protected ETL triggers, BCrypt password hashing, an encryption service and rate limiting
+• Operations: structured logging with Serilog, health checks and OpenAPI / Swagger documentation
+• Data: SQL Server through Entity Framework Core and Dapper, with SQL scripts, views and verification queries`,
+        tech: ['ASP.NET Core', '.NET 9', 'C#', 'SQL Server', 'Entity Framework Core', 'Dapper', 'JWT', 'Serilog', 'OpenAPI'],
+        year: 2026,
+        role: 'Backend Developer',
+        screenshotAlt: 'Architecture of the Eswatini Health Indicators API and ETL services',
+        category: 'enterprise',
+        featured: false
+    },
+    {
+        id: 'carte-pos',
+        name: 'Carte POS & Payments API',
+        shortDescription: 'Restaurant POS backend with orders, inventory, HR and payroll, and PayFast payments, built in FastAPI and Laravel.',
+        longDescription: `Backend services for Carte, a point-of-sale system for independent restaurants. A FastAPI and MongoDB API with about 97 endpoints covers the whole restaurant, and an earlier Laravel 12 backend explored the same domain.
+
+Key Features:
+• POS: foods, orders, products, customers and tables
+• HR: employees, shifts, timesheets and payroll
+• Inventory management
+• Authentication and authorization with JWT / OAuth2 bearer tokens
+• Payments: PayFast ITN integration with signature verification and server-side validation of payment notifications
+• Interactive OpenAPI documentation`,
+        tech: ['FastAPI', 'Python', 'MongoDB', 'Laravel 12', 'PHP', 'PayFast', 'JWT', 'OpenAPI'],
+        year: 2025,
+        role: 'Backend Developer',
+        screenshotAlt: 'Swagger documentation of the POS System API',
+        category: 'management',
+        featured: false
+    },
+    {
+        id: 'gatetrack-secure',
+        name: 'GateTrack Secure',
+        shortDescription: 'Gate and asset management PWA with QR scanning, visitor badges and an offline sync queue, branded for Ubombo Sugar, Eswatini.',
+        longDescription: `GateTrack Secure is a role-based Progressive Web App for gate officers, asset managers and administrators, branded for Ubombo Sugar in Eswatini.
+
+Key Features:
+• Roles: administrator, gate officers (with gate selection) and asset manager dashboards
+• Visitors: registration forms, QR scanning, verification panel and printable visitor badges
+• Assets: assignment and transfer between people and locations
+• Live log of gate activity
+• Offline-first: a sync queue keeps working without a connection and uploads when back online
+• Installable on phones, with an iOS install guide`,
+        tech: ['React', 'TypeScript', 'Vite', 'PWA', 'QR scanning', 'Service Workers'],
+        year: 2026,
+        role: 'Full-stack Developer',
+        screenshotAlt: 'GateTrack Secure login screen for Ubombo Sugar',
+        category: 'enterprise',
+        featured: false
+    },
+    {
+        id: 'dialysis-support-core',
+        name: 'Dialysis Support Core',
+        shortDescription: 'Offline-first PWA for dialysis patients: deterministic symptom triage and home-care recommendations.',
+        longDescription: `Dialysis Support Core helps people on dialysis assess symptoms and follow home-care advice, even without internet.
+
+Key Features:
+• Triage wizard: dialysis type (hemodialysis or peritoneal), schedule, dry and current weight, then symptoms
+• Deterministic rules: the same answers always give the same recommendation, so advice is predictable and explainable
+• History of past assessments and a profile
+• Local AI tab for on-device help
+• Offline-first PWA with a service worker, for patients with limited connectivity`,
+        tech: ['Angular 21', 'TypeScript', 'PWA', 'Service Workers', 'Offline-first'],
+        year: 2026,
+        role: 'Full-stack Developer',
+        screenshotAlt: 'Dialysis Support Core symptom assessment wizard',
+        category: 'utility',
+        featured: false
+    },
+    {
+        id: 'terra-finance',
+        name: 'Terra',
+        shortDescription: 'Local-first money tracker: expenses, shopping lists and budgets in ZAR, SZL and more, with data kept on your device.',
+        longDescription: `Terra is an earthy, privacy-first money tracker. Everything is stored on your own device, so your data is preserved and stays private.
+
+Key Features:
+• Log expenses, income and transfers in seconds, with categories and a camera shortcut for receipts
+• Shopping lists that learn what you buy and suggest it next time
+• Budgets that show how much is left each month
+• Multiple currencies including ZAR, SZL, USD, EUR, GBP, BWP and NAD
+• Local-first storage with IndexedDB (Dexie), so it works offline
+• Quality: Vitest unit tests and Playwright end-to-end tests`,
+        tech: ['React', 'TypeScript', 'Vite', 'Dexie (IndexedDB)', 'PWA', 'Vitest', 'Playwright'],
+        year: 2026,
+        role: 'Creator & Developer',
+        screenshotAlt: 'Terra expense entry sheet on mobile',
+        category: 'productivity',
+        featured: false
+    },
+    {
+        id: 'eventrecon',
+        name: 'EventRecon',
+        shortDescription: 'Reconstructs an event from many perspectives: people upload video, audio and photos, and the system matches them into one timeline.',
+        longDescription: `EventRecon is a prototype for multi-perspective event reconstruction. Several contributors upload their own media of the same event, and the system extracts features and matches them together.
+
+Key Features:
+• One deployable service: an Express API that also serves the built Angular app
+• In-process media processing: extraction and matching run right after upload, with no separate worker or queue
+• Storage: MongoDB for events, media, users and contributions, and S3-compatible storage (MinIO) for the files
+• Accounts, events, media and billing routes
+• Deployment: Docker Compose for local use and a Render blueprint for hosting`,
+        tech: ['Angular', 'Node.js', 'Express', 'MongoDB', 'MinIO / S3', 'Docker', 'Render'],
+        year: 2026,
+        role: 'Full-stack Developer',
+        screenshotAlt: 'EventRecon event reconstruction prototype',
+        category: 'utility',
+        featured: false
+    },
+    {
         id: 'agtfieldcore',
         name: 'AGT FieldCore',
         shortDescription: 'Offline-first PWA for construction field management with edge AI and digital accountability.',
